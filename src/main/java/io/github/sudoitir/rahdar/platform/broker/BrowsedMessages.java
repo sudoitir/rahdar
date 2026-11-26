@@ -3,9 +3,11 @@ package io.github.sudoitir.rahdar.platform.broker;
 import io.github.sudoitir.openbroker.messaging.Blob;
 import io.github.sudoitir.openbroker.messaging.JmsExtension;
 import io.github.sudoitir.openbroker.messaging.Message;
+import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.openbroker.messaging.MessageHeaders;
 import io.github.sudoitir.openbroker.messaging.MessagePart;
 import io.github.sudoitir.openbroker.messaging.PropertyValue;
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -27,12 +29,19 @@ public final class BrowsedMessages {
     private BrowsedMessages() {}
 
     public static BrowsedMessage of(Message m) {
+        return of(m, SchemaDecoder.RecordDecoder.none());
+    }
+
+    /** The one place a browsed message's decoded field is filled. */
+    public static BrowsedMessage of(Message m, SchemaDecoder.RecordDecoder decoding) {
         MessageHeaders h = m.headers();
+        boolean tombstone = m.body().isTombstone();
         Body body0 = body(m);
         byte[] raw = body0.bytes();
         boolean cut = m.truncated().contains(MessagePart.BODY) || body0.cut();
-        BodyDecoder.Decoded decoded = cut ? BodyDecoder.decodePrefix(raw) : BodyDecoder.decode(raw);
-        String body = decoded.isBinary() ? Base64.getEncoder().encodeToString(raw) : decoded.text();
+        DecodedRecordView decoded = decoding.value(tombstone ? MessageBody.tombstone() : MessageBody.of(raw), cut);
+        BodyDecoder.Decoded shown = cut ? BodyDecoder.decodePrefix(raw) : BodyDecoder.decode(raw);
+        String body = shown.isBinary() ? Base64.getEncoder().encodeToString(raw) : shown.text();
         Map<String, String> strings = new LinkedHashMap<>();
         Map<String, Long> ints = new LinkedHashMap<>();
         Map<String, Long> longs = new LinkedHashMap<>();
@@ -65,8 +74,8 @@ public final class BrowsedMessages {
                 h.replyTo().orElse(null),
                 h.id().orElse(null),
                 body,
-                decoded.isBinary() ? BodyEncoding.BASE64 : BodyEncoding.TEXT,
-                decoded.compression(),
+                shown.isBinary() ? BodyEncoding.BASE64 : BodyEncoding.TEXT,
+                shown.compression(),
                 h.contentType().orElse(null),
                 cut,
                 cut ? raw.length : null,
@@ -74,7 +83,9 @@ public final class BrowsedMessages {
                 ints,
                 longs,
                 doubles,
-                booleans);
+                booleans,
+                decoded,
+                null);
     }
 
     /** A record's key and how it is written: text when it reads as text, base64 when it does not. */

@@ -71,6 +71,97 @@ describe('MessageDetailPanel', () => {
     expect(screen.queryByText(/00000000/)).not.toBeInTheDocument();
   });
 
+  it('shows a decoded record first and keeps the raw bytes behind a disclosure', async () => {
+    mockDetail(
+      detail({
+        decoded: {
+          type: 'AVRO',
+          schemaId: 7,
+          subject: 'orders-value',
+          record: { sku: 'A-1' },
+          reason: null,
+          serialized: '{"sku":"A-1"}',
+          paths: { sku: 'A-1' },
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByRole('heading', { name: 'Record' })).toBeInTheDocument();
+    expect(screen.getByText('sku')).toBeInTheDocument();
+    const raw = screen.getByRole('button', { name: 'Show raw bytes' });
+    expect(raw).toHaveAttribute('aria-expanded', 'false');
+    await user.click(raw);
+    expect(screen.getByRole('button', { name: 'Hide raw bytes' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+  });
+
+  it('shows a decoded key beside the record', async () => {
+    mockDetail(
+      detail({
+        decoded: { type: 'AVRO', schemaId: 7, subject: 'orders-value', record: { sku: 'A-1' } },
+        decodedKey: { type: 'AVRO', schemaId: 9, subject: 'orders-key', record: { id: 1 } },
+      }),
+    );
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByRole('heading', { name: 'Key record' })).toBeInTheDocument();
+    expect(screen.getByText('orders-key')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Record' })).toBeInTheDocument();
+  });
+
+  it('shows an undecoded key with the reason, and does not treat a plain key as a failure', async () => {
+    mockDetail(
+      detail({
+        decodedKey: { reason: 'schema-not-found' },
+        decoded: { reason: 'truncated', serialized: null, record: null },
+        body: 'PPPPP',
+      }),
+    );
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByText('This key was not decoded')).toBeInTheDocument();
+    expect(screen.getByText('The registry does not hold the schema id this payload names.')).toBeInTheDocument();
+    expect(screen.getByText('The body was cut short of its schema, so it was not decoded.')).toBeInTheDocument();
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Record' })).not.toBeInTheDocument();
+  });
+
+  it('does not call a key with no schema id a failure', async () => {
+    mockDetail(detail({ decodedKey: { reason: 'no-schema-id' }, body: 'PPPPP' }));
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByText('String properties')).toBeInTheDocument();
+    expect(screen.queryByText('This key was not decoded')).not.toBeInTheDocument();
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+  });
+
+  it('downloads a text body as a text file, not as base64', async () => {
+    const user = userEvent.setup();
+    const spy = vi.spyOn(downloads, 'download').mockImplementation(() => {});
+    mockDetail(detail({ body: '{"sku":"A-1"}', bodyEncoding: 'TEXT' }));
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    await user.click(await screen.findByRole('button', { name: 'Download' }));
+    const [name, body] = spy.mock.calls[0];
+    expect(name).toBe('message-146.json');
+    expect(body).toBe('{"sku":"A-1"}');
+    spy.mockRestore();
+  });
+
+  it('shows an undecoded payload as bytes with the reason, never an empty record', async () => {
+    mockDetail(detail({ body: 'PPPPP', decoded: { reason: 'no-schema-id' } }));
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByText('This payload was not decoded')).toBeInTheDocument();
+    expect(screen.getByText(/no schema id/)).toBeInTheDocument();
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Record' })).not.toBeInTheDocument();
+    expect(screen.queryByText('{}')).not.toBeInTheDocument();
+    expect(screen.queryByText('The body is an empty object or array.')).not.toBeInTheDocument();
+  });
+
   it('shows the truncation banner with the broker.xml snippet when bodyTruncated', async () => {
     mockDetail(detail({ bodyTruncated: true, observedLimitBytes: 256 }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);

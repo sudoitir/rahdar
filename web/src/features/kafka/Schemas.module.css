@@ -1,0 +1,39 @@
+/* The schema wraps rather than scrolls: a scroller of code with no keyboard path fails axe, and a schema is
+ * read a field at a time, not a line at a time. */
+.schema {
+  margin: 0;
+  overflow-wrap: anywhere;
+  max-block-size: 24rem;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-sm);
+  white-space: pre-wrap;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-xs);
+  line-height: 1.5;
+  color: var(--as-text);
+  background: var(--as-surface-raised);
+  border: 1px solid var(--as-border);
+}
+
+.lines {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+/* A disclosure's chevron points at what it opens: right while closed, down once open. Rotating one icon
+   states that in one animated element instead of swapping two, so the change reads as a movement, not a flash. */
+.chevron {
+  transition: rotate var(--as-duration-fast) var(--as-ease);
+}
+
+.chevronOpen {
+  rotate: 90deg;
+}
+
+/* The disclosure's chevron and its words are one row; aligning them by baseline would lift the icon. */
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  color: var(--as-text);
+}

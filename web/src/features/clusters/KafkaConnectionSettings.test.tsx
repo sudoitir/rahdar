@@ -151,4 +151,79 @@ describe('CapabilitiesSection of a Kafka cluster', () => {
     expect(screen.queryByText('Live events')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Jolokia|broker\.xml/);
   });
+
+  it('asks for the registry kind when a URL is stored without one, and clears that once the kind matches', async () => {
+    server.use(
+      http.get('*/api/v1/clusters/:id', () =>
+        HttpResponse.json({
+          id: CLUSTER,
+          name: 'events',
+          description: null,
+          system: KAFKA_SYSTEM,
+          connection: {
+            seedUrls: [],
+            kafka: {
+              bootstrapServers: ['k1:9092'],
+              securityProtocol: 'PLAINTEXT',
+              secretStored: false,
+              registryKind: 'none',
+              registryUrl: 'https://registry:8081',
+              registrySecretStored: false,
+            },
+          },
+        }),
+      ),
+    );
+    const user = open();
+    await user.click(await screen.findByRole('button', { name: 'Check connection' }));
+    expect(
+      await screen.findByText('Set the registry kind to Confluent-compatible, or clear the URL.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Schema registry' }));
+    await user.click(await screen.findByRole('option', { name: 'Confluent-compatible' }));
+    expect(screen.getByRole('textbox', { name: 'Registry URL' })).toHaveValue('https://registry:8081');
+    expect(
+      screen.queryByText('Set the registry kind to Confluent-compatible, or clear the URL.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('asks for the registry credential again when the registry changes, and clears that once it is entered', async () => {
+    server.use(
+      http.get('*/api/v1/clusters/:id', () =>
+        HttpResponse.json({
+          id: CLUSTER,
+          name: 'events',
+          description: null,
+          system: KAFKA_SYSTEM,
+          connection: {
+            seedUrls: [],
+            kafka: {
+              bootstrapServers: ['k1:9092'],
+              securityProtocol: 'PLAINTEXT',
+              secretStored: false,
+              registryKind: 'confluent',
+              registryUrl: 'https://registry:8081',
+              registrySecretStored: true,
+            },
+          },
+        }),
+      ),
+    );
+    const user = open();
+    const url = await screen.findByRole('textbox', { name: 'Registry URL' });
+    expect(url).toHaveValue('https://registry:8081');
+    await user.clear(url);
+    await user.type(url, 'https://other:8081');
+    await user.click(screen.getByRole('button', { name: 'Check connection' }));
+    expect(
+      await screen.findByText(
+        'Enter the registry credential again: the stored one is never sent to a registry the cluster did not already use.',
+      ),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Registry credential'), 'user:secret');
+    await user.tab();
+    expect(screen.queryByText(/the stored one is never sent to a registry/)).not.toBeInTheDocument();
+  });
 });

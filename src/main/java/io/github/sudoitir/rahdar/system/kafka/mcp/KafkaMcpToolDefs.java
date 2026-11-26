@@ -30,6 +30,10 @@ public final class KafkaMcpToolDefs {
 
     private static final String CONFIRM_TOPIC = "A real run needs confirm equal to the topic name.";
 
+    private static final String CURSOR = "cursor";
+
+    private static final String SUBJECT = "subject";
+
     public static final List<McpToolDef> ALL = List.of(
             read(
                     "kafka_list_groups",
@@ -37,7 +41,7 @@ public final class KafkaMcpToolDefs {
                     Param.values("type", List.of("consumer", "share"), "Omit for both."),
                     Param.note("state", "A group state, such as stable, empty or rebalancing."),
                     Param.note("q", "Part of the group's name."),
-                    Param.note("cursor", "The next value of the previous page; absent for the first.")),
+                    Param.note(CURSOR, "The next value of the previous page; absent for the first.")),
             read(
                     "kafka_describe_group",
                     "One group's members, assignments, topics and per-partition lag.",
@@ -139,7 +143,7 @@ public final class KafkaMcpToolDefs {
                     "kafka_list_partitions",
                     "One page of a topic's partitions, in replica order, with who leads and how many bytes.",
                     Param.note(TOPIC, TOPIC_NAME),
-                    Param.note("cursor", "The next value of the previous page.")),
+                    Param.note(CURSOR, "The next value of the previous page.")),
             read(
                     "kafka_list_replication",
                     "Partitions that are under-replicated, offline, or not led by their first replica.",
@@ -183,7 +187,53 @@ public final class KafkaMcpToolDefs {
                     "Cancel named in-progress replica moves. A move this product did not start keeps its throttle.",
                     Param.note(PARTITIONS, "The same topic:partition list as the preview."),
                     Param.note("etag", ETAG),
-                    Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")));
+                    Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")),
+            read(
+                    "kafka_schema_subjects",
+                    "A page of a Kafka cluster's schema subjects.",
+                    Param.note(CURSOR, "The next value of the previous page; absent for the first."),
+                    Param.note("q", "Part of the subject's name.")),
+            read(
+                    "kafka_schema_subject",
+                    "One subject's versions, schema text and compatibility. A soft-deleted version stays listed.",
+                    Param.note(SUBJECT, "The subject's name.")),
+            mutate(
+                    "kafka_register_schema",
+                    "Register a schema under a subject. Previews by default; a real run needs the etag.",
+                    Param.note(SUBJECT, "The subject name."),
+                    Param.note("type", "AVRO, PROTOBUF or JSON."),
+                    Param.note("schema", "The schema text."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the subject name.")),
+            mutate(
+                    "kafka_set_schema_compatibility",
+                    "Set a subject's compatibility, or the registry default when subject is omitted.",
+                    Param.note(SUBJECT, "The subject. Omit to set the registry default."),
+                    Param.note(
+                            "level",
+                            "BACKWARD, BACKWARD_TRANSITIVE, FORWARD, FORWARD_TRANSITIVE, FULL, FULL_TRANSITIVE or NONE."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the subject, or 'default'.")),
+            mutate(
+                    "kafka_delete_subject",
+                    "Delete a subject. permanent soft-deletes and then deletes the schema, which cannot be restored.",
+                    Param.note(SUBJECT, "The subject name."),
+                    Param.note("permanent", "True soft-deletes and then deletes the schema. False soft-deletes only."),
+                    Param.note(
+                            DRY_RUN, McpToolDef.DRY_RUN + " A permanent preview says the schemas cannot be restored."),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the subject name.")),
+            mutate(
+                    "kafka_set_schema_binding",
+                    "Bind a topic side to a serde this installation runs. A class name is refused.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("side", "key or value."),
+                    Param.note("serde", "avro, protobuf or json. Never a class name."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, CONFIRM_TOPIC)));
 
     private KafkaMcpToolDefs() {}
 

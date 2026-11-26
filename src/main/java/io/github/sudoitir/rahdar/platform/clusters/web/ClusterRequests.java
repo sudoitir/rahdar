@@ -203,6 +203,9 @@ public final class ClusterRequests {
          * @param credentials a user name and password for PLAIN and SCRAM, a token for OAUTHBEARER
          * @param tlsBundle optional Spring SSL bundle: the trust store and a client certificate
          * @param clientId optional client id the brokers see in their logs
+         * @param registryKind {@code none} or {@code confluent}; omitted means none
+         * @param registryUrl a Confluent-compatible registry's base URL
+         * @param registryCredentials the registry credential as {@code user:password}; never returned
          */
         public record KafkaConnection(
                 @NotBlank @Schema(allowableValues = "kafka") String system,
@@ -211,8 +214,55 @@ public final class ClusterRequests {
                 String saslMechanism,
                 @Valid KafkaCredentials credentials,
                 String tlsBundle,
-                String clientId)
-                implements Connection {}
+                String clientId,
+
+                @Schema(allowableValues = {"none", "confluent"})
+                String registryKind,
+
+                String registryUrl,
+
+                @Schema(description = "user:password. Never returned.")
+                String registryCredentials)
+                implements Connection {
+
+            /** A registration that names no schema registry. */
+            public KafkaConnection(
+                    String system,
+                    List<String> bootstrapServers,
+                    String securityProtocol,
+                    String saslMechanism,
+                    KafkaCredentials credentials,
+                    String tlsBundle,
+                    String clientId) {
+                this(
+                        system,
+                        bootstrapServers,
+                        securityProtocol,
+                        saslMechanism,
+                        credentials,
+                        tlsBundle,
+                        clientId,
+                        null,
+                        null,
+                        null);
+            }
+
+            public KafkaConnection {
+                if (registryKind == null || registryKind.isBlank()) {
+                    registryKind = "none";
+                }
+            }
+
+            /** The registry credential is never printed. */
+            @Override
+            public String toString() {
+                return "KafkaConnection[system=" + system + ", bootstrapServers=" + bootstrapServers
+                        + ", securityProtocol=" + securityProtocol + ", saslMechanism=" + saslMechanism
+                        + ", credentials=" + credentials + ", tlsBundle=" + tlsBundle + ", clientId=" + clientId
+                        + ", registryKind=" + registryKind + ", registryUrl=" + registryUrl + ", registryCredentials="
+                        + (registryCredentials == null ? "none" : SecretRedactor.MASK) + "]";
+            }
+        }
 
         /**
          * A RabbitMQ cluster is reached at its management API and, for browsing, sending and receiving, its AMQP
@@ -450,8 +500,56 @@ public final class ClusterRequests {
                 String saslMechanism,
                 @Valid KafkaCredentials credentials,
                 String tlsBundle,
-                String clientId)
-                implements ConnectionUpdate {}
+                String clientId,
+
+                @Schema(
+                        nullable = true,
+                        allowableValues = {"none", "confluent"},
+                        description = "Omitted leaves the stored registry. none clears it.")
+                String registryKind,
+
+                @Schema(nullable = true) String registryUrl,
+
+                @Schema(
+                        nullable = true,
+                        description =
+                                "user:password. Empty or omitted keeps the stored credential unless the registry changed. Never returned.")
+                String registryCredentials)
+                implements ConnectionUpdate {
+
+            /** An edit that does not touch the schema registry. */
+            public KafkaConnectionUpdate(
+                    String system,
+                    List<String> bootstrapServers,
+                    String securityProtocol,
+                    String saslMechanism,
+                    KafkaCredentials credentials,
+                    String tlsBundle,
+                    String clientId) {
+                this(
+                        system,
+                        bootstrapServers,
+                        securityProtocol,
+                        saslMechanism,
+                        credentials,
+                        tlsBundle,
+                        clientId,
+                        null,
+                        null,
+                        null);
+            }
+
+            /** The registry credential is never printed. */
+            @Override
+            public String toString() {
+                return "KafkaConnectionUpdate[system=" + system + ", bootstrapServers=" + bootstrapServers
+                        + ", securityProtocol=" + securityProtocol + ", saslMechanism=" + saslMechanism
+                        + ", credentials=" + credentials + ", tlsBundle=" + tlsBundle + ", clientId=" + clientId
+                        + ", registryKind=" + registryKind + ", registryUrl=" + registryUrl + ", registryCredentials="
+                        + (registryCredentials == null || registryCredentials.isBlank() ? "none" : SecretRedactor.MASK)
+                        + "]";
+            }
+        }
 
         /**
          * A RabbitMQ cluster's edit: a field left out is left as it is, and a secret left out keeps the stored one,

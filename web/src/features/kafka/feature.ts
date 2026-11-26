@@ -1,6 +1,7 @@
 import {
   IconBuildingBroadcastTower,
   IconLock,
+  IconSchema,
   IconStack2,
   IconUsersGroup,
   IconArrowsTransferUp,
@@ -13,7 +14,7 @@ import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { CreateTopicForm } from './CreateTopicForm.tsx';
 import { TopicConfiguration, TopicPartitions } from './rowActions.tsx';
 import { DeleteTopic, IncreasePartitions } from './TopicLifecycleActions.tsx';
-import { validateAclSearch, validateGroupsSearch, validateReplicationSearch } from './search.ts';
+import { validateAclSearch, validateGroupsSearch, validateReplicationSearch, validateSchemasSearch } from './search.ts';
 
 const view = <K extends string>(load: () => Promise<Record<K, () => React.ReactNode>>, name: K) =>
   lazyFeatureView('kafka', load, name, 'kafka');
@@ -75,6 +76,19 @@ const brokersRoute = createRoute({
   component: view(() => import('./BrokersView.tsx'), 'BrokersView'),
 });
 
+const schemasRoute = createRoute({
+  getParentRoute: () => clusterRoute,
+  path: 'kafka/schemas',
+  component: view(() => import('./SchemasView.tsx'), 'SchemasView'),
+  validateSearch: validateSchemasSearch,
+});
+
+const schemaSubjectRoute = createRoute({
+  getParentRoute: () => clusterRoute,
+  path: 'kafka/schemas/$subject',
+  component: view(() => import('./SubjectView.tsx'), 'SubjectView'),
+});
+
 /**
  * Apache Kafka (ADR-0216): consumer groups with their offsets and the reset of them, topic and broker configuration,
  * ACLs, transactions, brokers, partition placement and replication. Every view is for a Kafka cluster;
@@ -94,6 +108,8 @@ export const kafkaFeature = defineFeature({
       brokersRoute,
       brokerConfigRoute,
       replicationRoute,
+      schemasRoute,
+      schemaSubjectRoute,
     ],
   },
   nav: [
@@ -141,6 +157,15 @@ export const kafkaFeature = defineFeature({
       path: 'kafka/acls',
       system: 'kafka',
       permission: 'access-rule:read',
+    },
+    {
+      group: 'configuration',
+      order: 50,
+      label: 'Schemas',
+      icon: IconSchema,
+      path: 'kafka/schemas',
+      system: 'kafka',
+      permission: 'schema:read',
     },
   ],
   slots: {

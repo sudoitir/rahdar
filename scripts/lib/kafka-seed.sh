@@ -36,11 +36,17 @@ kafka_register() {
     api DELETE "/clusters/$existing" >/dev/null
   fi
   servers=$(printf '%s' "$KAFKA_BOOTSTRAP" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split(",")))')
+  # A schema registry when the stack has one (compose.qa-registry.yaml). Without it the cluster registers with
+  # none, which is the no-registry state the sweep captures.
+  local registry=''
+  if $COMPOSE config --services 2>/dev/null | grep -qx apicurio; then
+    registry=', "registryKind": "confluent", "registryUrl": "http://apicurio:8080/apis/ccompat/v7"'
+  fi
   kafka_cluster=$(api POST /clusters -d "{
     \"system\": \"kafka\",
     \"name\": \"events\",
     \"description\": \"Kafka — topics, consumer groups, a share group and a transaction left open\",
-    \"connection\": {\"system\": \"kafka\", \"bootstrapServers\": $servers, \"securityProtocol\": \"PLAINTEXT\"}
+    \"connection\": {\"system\": \"kafka\", \"bootstrapServers\": $servers, \"securityProtocol\": \"PLAINTEXT\"$registry}
   }" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
   echo "registered: $kafka_cluster"
 }
@@ -145,4 +151,69 @@ kafka_seed_long() {
   kafka_produce "$topic" 5000 1000
   kafka kafka-console-consumer.sh --bootstrap-server "$KAFKA_BOOTSTRAP" --topic "$topic" --group "$group" \
     --from-beginning --max-messages 50 --timeout-ms 20000 >/dev/null 2>&1 || true
+}
+
+
+# Schemas, for the registry screens: three types, a second version of one subject so there is a version list,
+# a compatibility level, and the binding the browse screen decodes orders by. Registered through Rahdar's own
+# API, so a stack whose cluster has no registry seeds nothing and says so.
+kafka_seed_schemas() {
+  local cluster base body
+  cluster=$(find_id /clusters name events)
+  if [ -z "$cluster" ]; then
+    echo "  no Kafka cluster to seed schemas into" >&2
+    return 0
+  fi
+  base="/clusters/$cluster/kafka/schemas"
+  if ! api GET "$base?filter=" | grep -q '"items"'; then
+    echo "  the cluster has no schema registry: nothing to seed" >&2
+    return 0
+  fi
+  say "registering schemas"
+
+  # register SUBJECT TYPE JSON-SCHEMA: preview to take the etag, then apply it, as the screen does. The apply
+  # refuses without an etag, so a one-call seed would write nothing and report success anyway.
+  register() {
+    local etag
+    etag=$(printf '%s' "$3" | python3 -c 'import json,sys; print(json.dumps({"subject":sys.argv[1],"type":sys.argv[2],"schema":sys.stdin.read()}))' "$1" "$2" \
+      | api POST "$base:register-preview" -d @- \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["etag"])' 2>/dev/null)
+    if [ -z "$etag" ]; then
+      echo "  schema $1: no preview, nothing registered" >&2
+      return 0
+    fi
+    body=$(printf '%s' "$3" | python3 -c 'import json,sys; print(json.dumps({"subject":sys.argv[1],"type":sys.argv[2],"schema":sys.stdin.read(),"etag":sys.argv[3]}))' "$1" "$2" "$etag")
+    if api POST "$base:register" -d "$body" | grep -q '"version"'; then
+      echo "  schema $1"
+    else
+      echo "  schema $1: the apply was refused" >&2
+    fi
+  }
+
+  local order='{"type":"record","name":"Order","fields":[{"name":"id","type":"string"},{"name":"total","type":"double"}]}'
+  local orderV2='{"type":"record","name":"Order","fields":[{"name":"id","type":"string"},{"name":"total","type":"double"},{"name":"currency","type":"string","default":"EUR"}]}'
+  # A PROTOBUF subject is .proto source, not a JSON schema: the registry compiles it.
+  local payment='syntax = "proto3"; message Payment { string id = 1; double amount = 2; bool settled = 3; }'
+  local state='{"type":"object","properties":{"account":{"type":"string"},"balance":{"type":"number"}},"required":["account"]}'
+
+  register orders-value AVRO "$order"
+  register orders-value AVRO "$orderV2"
+  register payments-value PROTOBUF "$payment"
+  register customer-state-value JSON "$state"
+
+  # Forward compatibility on one subject, so a subject page shows a level that was chosen rather than the default.
+  # It is a preview and an apply too, for the same reason.
+  etag=$(api POST "$base/orders-value:compatibility-preview" -d '{"level":"FORWARD"}' \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["etag"])' 2>/dev/null)
+  if [ -n "$etag" ]; then
+    api POST "$base/orders-value:compatibility" -d "{\"level\":\"FORWARD\",\"etag\":\"$etag\"}" >/dev/null \
+      || echo "  no compatibility level on orders-value" >&2
+  fi
+  # The binding a browsed orders record is decoded by: preview, then apply with its etag.
+  etag=$(api POST "$base/bindings:preview" -d '{"topic":"orders","side":"value","serde":"avro"}' \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["etag"])' 2>/dev/null)
+  if [ -n "$etag" ]; then
+    api PUT "$base/bindings" -d "{\"topic\":\"orders\",\"side\":\"value\",\"serde\":\"avro\",\"etag\":\"$etag\"}" >/dev/null \
+      || echo "  no binding for orders" >&2
+  fi
 }

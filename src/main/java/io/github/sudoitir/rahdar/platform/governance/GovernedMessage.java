@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.governance;
 
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +23,20 @@ public record GovernedMessage(
         List<Redaction> redactions,
         List<Withheld> withheld,
         Map<String, String> sealable,
-        int policyVersion) {
+        int policyVersion,
+        DecodedRecordView decoded,
+        DecodedRecordView decodedKey) {
+
+    public GovernedMessage(
+            Map<String, String> headers,
+            Map<String, Object> properties,
+            String body,
+            List<Redaction> redactions,
+            List<Withheld> withheld,
+            Map<String, String> sealable,
+            int policyVersion) {
+        this(headers, properties, body, redactions, withheld, sealable, policyVersion, null, null);
+    }
 
     /** One sensitive value: where it is, what it is, what was done, and whether it was served clear by grant. */
     public record Redaction(Location location, String path, DataClass dataClass, Action action, boolean clear) {}

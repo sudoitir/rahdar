@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,11 @@ public record QueryResult(
              */
             Long sourceMessageId,
             /** The log this row was read from, as a resource id text; null for a queue. */
-            String log) {
+            String log,
+            /** The record a schema id decoded to, or why it did not. Null when this row was not decoded. */
+            DecodedRecordView decoded,
+            /** The key decoded with the key binding, or null when the record had no key or no registry. */
+            DecodedRecordView decodedKey) {
 
         /** A row of a queue, or of the index. */
         public Row(
@@ -123,6 +128,8 @@ public record QueryResult(
                     lastSeenAt,
                     origin,
                     sourceMessageId,
+                    null,
+                    null,
                     null);
         }
     }

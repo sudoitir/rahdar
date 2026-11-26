@@ -68,6 +68,26 @@ class McpReplicationAccessTest {
         verify(delegate, never()).handleRequest(any(), any());
     }
 
+    @Test
+    void aSchemaDeleteIsRefusedForAReadOnlyTokenAndForArtemisBeforeTheToolRuns() {
+        assertThat(gate(true)
+                        .wrap(delegate)
+                        .handleRequest(null, call("kafka_delete_subject", kafka))
+                        .block()
+                        .result()
+                        .toString())
+                .contains("read-only");
+        assertThat(gate(false)
+                        .wrap(delegate)
+                        .handleRequest(null, call("kafka_delete_subject", artemis))
+                        .block()
+                        .result()
+                        .toString())
+                .contains("applies to Kafka clusters")
+                .contains("Artemis");
+        verify(delegate, never()).handleRequest(any(), any());
+    }
+
     @SuppressWarnings("unchecked")
     private McpGate gate(boolean readOnly) {
         when(settings.bool(McpSettings.READ_ONLY)).thenReturn(readOnly);

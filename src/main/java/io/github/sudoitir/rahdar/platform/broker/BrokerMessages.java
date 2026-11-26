@@ -11,6 +11,7 @@ import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.Count;
 import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageAction;
+import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
 import io.github.sudoitir.openbroker.messaging.MessageHandler;
@@ -47,6 +48,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -68,9 +71,20 @@ public class BrokerMessages {
     private static final String RECEIVE_PURPOSE = "receive messages over";
 
     private final BrokerGateway gateway;
+    private final SchemaDecoder decoder;
 
     public BrokerMessages(BrokerGateway gateway) {
+        this(gateway, SchemaDecoder.none());
+    }
+
+    @Autowired
+    public BrokerMessages(BrokerGateway gateway, ObjectProvider<SchemaDecoder> decoders) {
+        this(gateway, decoders.getIfAvailable(SchemaDecoder::none));
+    }
+
+    private BrokerMessages(BrokerGateway gateway, SchemaDecoder decoder) {
         this.gateway = gateway;
+        this.decoder = decoder;
     }
 
     /** One page of a queue on a node, 1-based, with the broker's own count of the queue. */
@@ -115,10 +129,16 @@ public class BrokerMessages {
                 }
                 throw e;
             }
+            SchemaDecoder.Sides sides = decoder.open(clusterId, log.name());
             Within<LogPage.LogRecord> kept = within(result.messages(), m -> {
                 BrowsedMessages.Key key = BrowsedMessages.keyOf(m);
+                BrowsedMessage value = BrowsedMessages.of(m, sides.values());
+                BrowsedMessage browsed = m.headers()
+                        .key()
+                        .map(blob -> value.withDecodedKey(sides.keys().value(MessageBody.of(blob), false)))
+                        .orElse(value);
                 return new LogPage.LogRecord(
-                        BrowsedMessages.of(m),
+                        browsed,
                         m.body().isTombstone(),
                         key == null ? null : key.text(),
                         key == null ? null : key.encoding());

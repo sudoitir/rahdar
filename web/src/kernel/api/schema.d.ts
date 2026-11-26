@@ -260,6 +260,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clusters/{clusterId}/kafka/schemas/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["bindings"];
+        put: operations["bind"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{clusterId}/environment": {
         parameters: {
             query?: never;
@@ -1147,7 +1163,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["bindings"];
+        get: operations["bindings_1"];
         put?: never;
         post: operations["createBinding"];
         delete?: never;
@@ -1358,6 +1374,134 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["applyConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas:register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["register_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas:register-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas:default-compatibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas:default-compatibility-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas/{subject}:delete-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewDelete_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas/{subject}:compatibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setCompatibility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas/{subject}:compatibility-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewCompatibility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas/bindings:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewBinding"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3348,6 +3492,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clusters/{clusterId}/kafka/schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["subjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/schemas/{subject}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["subject"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_8"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{clusterId}/kafka/replication": {
         parameters: {
             query?: never;
@@ -4254,7 +4430,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["delete_8"];
+        delete: operations["delete_9"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4270,7 +4446,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["delete_9"];
+        delete: operations["delete_10"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4771,6 +4947,17 @@ export interface components {
             read: string;
             /** @description The preview's etag; required on a real call. */
             etag?: string;
+        };
+        SchemaBindingRequest: {
+            topic?: string;
+            side?: string;
+            serde?: string;
+            etag?: string | null;
+        };
+        SchemaBinding: {
+            topic?: string;
+            side?: string;
+            serde?: string;
         };
         AssignEnvironmentRequest: {
             /** Format: uuid */
@@ -5477,6 +5664,11 @@ export interface components {
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
+            /** @enum {string} */
+            registryKind?: "none" | "confluent";
+            registryUrl?: string;
+            /** @description user:password. Never returned. */
+            registryCredentials?: string;
         };
         KafkaCredentials: {
             username?: string;
@@ -5713,6 +5905,11 @@ export interface components {
             secretStored: boolean;
             tlsBundle?: string | null;
             clientId?: string | null;
+            /** @enum {string} */
+            registryKind: "none" | "confluent";
+            registryUrl?: string | null;
+            /** @description Whether a registry credential is stored. The credential itself is never returned. */
+            registrySecretStored: boolean;
         };
         KindName: {
             /** @description The name of one, such as Queue. */
@@ -6475,6 +6672,43 @@ export interface components {
             changes: components["schemas"]["ConfigChangeRow"][];
             valid: boolean;
             etag: string;
+        };
+        SchemaRegisterRequest: {
+            subject?: string;
+            type?: string;
+            schema?: string;
+            etag?: string | null;
+        };
+        SchemaVersionView: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            version: number;
+            type?: string;
+            schema?: string;
+            deleted: boolean;
+        };
+        SchemaPreview: {
+            etag?: string;
+            subject?: string | null;
+            action?: string;
+            before?: string[];
+            after?: string[];
+            compatibilityOutcome?: string | null;
+            checkOnApply: boolean;
+            alreadyRegistered: boolean;
+            /** Format: int32 */
+            existingVersionId?: number | null;
+            note?: string | null;
+            statement?: string;
+            writesNothing: boolean;
+        };
+        SchemaCompatibilityRequest: {
+            level?: string;
+            etag?: string | null;
+        };
+        SchemaDeleteRequest: {
+            permanent?: boolean;
         };
         KafkaPartitionSelection: {
             partitions?: components["schemas"]["KafkaSelectedPartition"][];
@@ -7352,6 +7586,14 @@ export interface components {
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
+            /**
+             * @description Omitted leaves the stored registry. none clears it.
+             * @enum {string|null}
+             */
+            registryKind?: "none" | "confluent" | null;
+            registryUrl?: string | null;
+            /** @description user:password. Empty or omitted keeps the stored credential unless the registry changed. Never returned. */
+            registryCredentials?: string | null;
         };
         RabbitMqConnectionUpdate: {
             /**
@@ -8405,6 +8647,18 @@ export interface components {
             /** Format: int64 */
             value: number;
         };
+        DecodedRecordView: {
+            type?: string;
+            /** Format: int32 */
+            schemaId?: number;
+            subject?: string;
+            record?: unknown;
+            reason?: string;
+            serialized?: string;
+            paths?: {
+                [key: string]: string;
+            };
+        };
         ProblemDetail: {
             /** Format: uri */
             type?: string;
@@ -8529,6 +8783,10 @@ export interface components {
             redactions?: components["schemas"]["RedactionView"][];
             /** @description Content of this row that was not shown, and why. */
             withheld?: components["schemas"]["WithheldView"][];
+            /** @description The record a schema id decoded to, or why it did not. Null when this row was not decoded. */
+            decoded?: components["schemas"]["DecodedRecordView"] | null;
+            /** @description The key decoded with the topic's key binding. */
+            decodedKey?: components["schemas"]["DecodedRecordView"] | null;
         };
         /** @description What one node contributed, including nothing and why. */
         SqlNodeOutcomeView: {
@@ -9004,6 +9262,10 @@ export interface components {
              * @enum {string|null}
              */
             keyEncoding?: "TEXT" | "BASE64" | null;
+            /** @description The record a schema id decoded to, or why it did not. Never an empty stand-in. */
+            decoded?: components["schemas"]["DecodedRecordView"] | null;
+            /** @description The key decoded with the topic's key binding, or why it did not. */
+            decodedKey?: components["schemas"]["DecodedRecordView"] | null;
         };
         /** @description Who has access to one subscription or destination through teams: its owner and every share. */
         ResourceAccessView: {
@@ -9346,6 +9608,29 @@ export interface components {
             /** @description Why every setting is read-only. */
             readOnlyReason?: string | null;
             entries: components["schemas"]["ConfigEntry"][];
+        };
+        SchemaSubjectPage: {
+            items: components["schemas"]["SchemaSubjectRow"][];
+            /** @description The cursor of the next page; absent on the last. */
+            next?: string | null;
+        };
+        SchemaSubjectRow: {
+            name?: string;
+            compatibility?: string | null;
+            compatibilityNote?: string | null;
+            /** Format: int32 */
+            versions: number;
+        };
+        SchemaSubject: {
+            name?: string;
+            type?: string | null;
+            versions?: components["schemas"]["SchemaVersionView"][];
+            compatibility?: string | null;
+            compatibilityNote?: string | null;
+            schemaText?: string | null;
+        };
+        SchemaBindingPage: {
+            items: components["schemas"]["SchemaBinding"][];
         };
         ReassignmentList: {
             items: components["schemas"]["ReassignmentRow"][];
@@ -12537,6 +12822,138 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RabbitMqChangePreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    bindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaBindingPage"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    bind: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaBinding"];
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */
@@ -17338,7 +17755,7 @@ export interface operations {
             };
         };
     };
-    bindings: {
+    bindings_1: {
         parameters: {
             query?: {
                 vhost?: string;
@@ -18339,6 +18756,554 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    register_1: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaVersionView"];
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewRegister: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    setDefault: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaCompatibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": "BACKWARD" | "BACKWARD_TRANSITIVE" | "FORWARD" | "FORWARD_TRANSITIVE" | "FULL" | "FULL_TRANSITIVE" | "NONE";
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewDefault: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaCompatibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewDelete_1: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    setCompatibility: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaCompatibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": "BACKWARD" | "BACKWARD_TRANSITIVE" | "FORWARD" | "FORWARD_TRANSITIVE" | "FULL" | "FULL_TRANSITIVE" | "NONE";
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewCompatibility: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaCompatibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewBinding: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemaBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaPreview"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */
@@ -27021,6 +27986,197 @@ export interface operations {
             };
         };
     };
+    subjects: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                filter?: string;
+            };
+            header?: never;
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaSubjectPage"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    subject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clusterId: string;
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SchemaSubject"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    delete_8: {
+        parameters: {
+            query?: {
+                permanent?: boolean;
+            };
+            header?: {
+                "If-Match"?: string;
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     replication: {
         parameters: {
             query?: {
@@ -30493,7 +31649,7 @@ export interface operations {
             };
         };
     };
-    delete_8: {
+    delete_9: {
         parameters: {
             query?: never;
             header?: {
@@ -30551,7 +31707,7 @@ export interface operations {
             };
         };
     };
-    delete_9: {
+    delete_10: {
         parameters: {
             query?: never;
             header?: {

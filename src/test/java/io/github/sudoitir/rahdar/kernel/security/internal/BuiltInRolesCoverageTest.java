@@ -155,4 +155,18 @@ class BuiltInRolesCoverageTest extends PostgresIntegrationTest {
             assertThat(builtIns.get(role)).as(role).doesNotContain("destination:delete");
         }
     }
+
+    @Test
+    void schemaWriteIsItsOwnPermission() {
+        Map<String, Set<String>> builtIns = builtIns();
+        PermissionDef write = CORE.stream()
+                .filter(permission -> permission.action().equals("schema:write"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(builtIns.get("OPERATOR")).contains("schema:read", "schema:write");
+        assertThat(builtIns.get("VIEWER")).contains("schema:read").doesNotContain("schema:write");
+        assertThat(write.requires()).containsExactly("schema:read");
+        assertThat(write.requires()).doesNotContain("destination:update");
+    }
 }

@@ -1,0 +1,206 @@
+import { useMemo, useState, type ReactNode } from 'react';
+import { Button, Text, TextInput } from '@mantine/core';
+import { useDebouncedCallback } from '@mantine/hooks';
+import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
+
+import { useCan } from '../../kernel/auth/useCan.ts';
+import { SectionNav } from '../../kernel/shell/SectionNav.tsx';
+import { useCluster } from '../clusters/index.ts';
+import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
+import { EmptyState } from '../../ui/EmptyState.tsx';
+import { ErrorState } from '../../ui/ErrorState.tsx';
+import linkClasses from '../../ui/InlineLink.module.css';
+import { Notice } from '../../ui/Notice.tsx';
+import { Page } from '../../ui/Page.tsx';
+import { PageHeader } from '../../ui/PageHeader.tsx';
+import { Toolbar } from '../../ui/Toolbar.tsx';
+import { DataTable } from '../../ui/table/index.ts';
+import { BindingsView } from './BindingsView.tsx';
+import { RegisterSchemaDialog } from './RegisterSchemaDialog.tsx';
+import { RegistryDefault } from './RegistryDefault.tsx';
+import { schemaColumns } from './schemaColumns.tsx';
+import { registryReason, schemaWriteGate, useSchemaSubjects } from './schemasApi.ts';
+import type { SchemasSearch } from './search.ts';
+
+/** The registry cannot be used: the driver's reason, and where to configure the connection. */
+function Unavailable({ clusterId, reason }: Readonly<{ clusterId: string; reason: string }>) {
+  return (
+    <Notice
+      tone="warning"
+      title="The schema registry is unavailable"
+      action={
+        <Link to={`/clusters/${clusterId}/settings?tab=clusters-connection`} className={linkClasses.link}>
+          Connection settings
+        </Link>
+      }
+    >
+      {reason}
+    </Notice>
+  );
+}
+
+/** "1 subject", "4 subjects", "1 matching subject", "4 matching subjects". */
+function subjectCount(filtered: boolean, count: number): string {
+  const noun = count === 1 ? 'subject' : 'subjects';
+  return `${count}${filtered ? ' matching' : ''} ${noun}`;
+}
+
+function SubjectsEmpty({
+  filtered,
+  canRegister,
+  register,
+  onClear,
+}: Readonly<{ filtered: boolean; canRegister: boolean; register: ReactNode; onClear: () => void }>) {
+  if (!filtered) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="No subjects"
+        description="A subject is a named schema, usually a topic's key or value, with a compatibility level and one version per registration."
+        action={canRegister ? register : undefined}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      kind="filtered"
+      title="No subject matches this filter"
+      description="Clear it to see every subject."
+      onClearFilters={onClear}
+    />
+  );
+}
+
+function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) {
+  const navigate = useNavigate();
+  const cluster = useCluster(clusterId);
+  const subjects = useSchemaSubjects(clusterId, q);
+  const { can, loading } = useCan();
+  const [draft, setDraft] = useState(q);
+  const [registering, setRegistering] = useState(false);
+  const writeQ = useDebouncedCallback((value: string) => {
+    void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, q: value || undefined }) });
+  }, 250);
+
+  const unavailable = registryReason(cluster.data?.capabilities.findings, subjects.error);
+  const gate = schemaWriteGate(can('schema:write', clusterId), loading, unavailable);
+  const rows = subjects.data?.pages.flatMap((page) => page.items) ?? [];
+  const columns = useMemo(() => schemaColumns(clusterId), [clusterId]);
+  const filtered = q.length > 0;
+  const failed = subjects.isError && !unavailable;
+
+  const register = (
+    <CapabilityGate verdict={gate} what="registering a schema">
+      <Button size="xs" disabled={gate.kind === 'blocked'} onClick={() => setRegistering(true)}>
+        Register a schema
+      </Button>
+    </CapabilityGate>
+  );
+
+  return (
+    <>
+      {unavailable ? <Unavailable clusterId={clusterId} reason={unavailable} /> : null}
+      <RegistryDefault clusterId={clusterId} />
+      <Toolbar
+        label="Subject filters"
+        start={
+          <TextInput
+            label="Subject"
+            size="xs"
+            w="16rem"
+            value={draft}
+            placeholder="Search subjects"
+            onChange={(event) => {
+              setDraft(event.currentTarget.value);
+              writeQ(event.currentTarget.value);
+            }}
+          />
+        }
+        end={
+          <>
+            {rows.length > 0 || filtered || gate.kind === 'blocked' || subjects.isPending ? register : null}
+            {subjects.isSuccess && !unavailable && subjects.hasNextPage ? (
+              <Button
+                size="xs"
+                variant="default"
+                loading={subjects.isFetchingNextPage}
+                onClick={() => void subjects.fetchNextPage()}
+              >
+                Load more subjects
+              </Button>
+            ) : null}
+            {subjects.isSuccess && !unavailable && !subjects.hasNextPage ? (
+              <Text size="xs" c="dimmed">
+                {subjectCount(filtered, rows.length)}
+              </Text>
+            ) : null}
+          </>
+        }
+      />
+      {unavailable ? null : (
+        <DataTable
+          label="Schema subjects"
+          storageKey="kafka.schemas"
+          height="fill"
+          columns={columns}
+          data={rows}
+          rowKey={(row) => row.name ?? ''}
+          loading={subjects.isPending}
+          error={failed ? <ErrorState error={subjects.error} onRetry={() => void subjects.refetch()} /> : undefined}
+          empty={
+            <SubjectsEmpty
+              filtered={filtered}
+              canRegister={gate.kind === 'allowed'}
+              register={register}
+              onClear={() => {
+                setDraft('');
+                writeQ.cancel();
+                void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, q: undefined }) });
+              }}
+            />
+          }
+        />
+      )}
+      <RegisterSchemaDialog clusterId={clusterId} opened={registering} onClose={() => setRegistering(false)} />
+    </>
+  );
+}
+
+/**
+ * A Kafka cluster's schema registry: subjects, and which serde decodes a topic's key or value.
+ * The screen stays when no registry is configured; actions stay visible and say why.
+ */
+export function SchemasView() {
+  const { clusterId } = useParams({ strict: false }) as { clusterId: string };
+  const search = useSearch({ strict: false }) as SchemasSearch;
+
+  return (
+    <Page fill>
+      <PageHeader
+        title="Schemas"
+        description="Subjects in the cluster's schema registry, and the serde that decodes a topic's key or value."
+      />
+      <SectionNav
+        label="Schema sections"
+        groups={[
+          {
+            id: 'schemas',
+            label: 'Registry',
+            tabs: [
+              {
+                id: 'subjects',
+                title: 'Subjects',
+                panel: <Subjects clusterId={clusterId} q={search.q ?? ''} />,
+              },
+              {
+                id: 'bindings',
+                title: 'Bindings',
+                panel: <BindingsView clusterId={clusterId} />,
+              },
+            ],
+          },
+        ]}
+      />
+    </Page>
+  );
+}

@@ -115,6 +115,7 @@ class KafkaRegistrar implements ClusterRegistrar {
     private final KafkaConnectionRepository connections;
     private final ConnectionSettingsSource settings;
     private final BootstrapProbe bootstrapProbe;
+    private final KafkaRegistrySecrets registrySecrets;
 
     @Override
     public String system() {
@@ -168,6 +169,9 @@ class KafkaRegistrar implements ClusterRegistrar {
         params.put("saslMechanism", kafka.saslMechanism());
         params.put("clientId", kafka.clientId());
         params.put("tlsBundle", kafka.tlsBundle());
+        params.put("registryKind", kafka.registryKind());
+        params.put("registryUrl", kafka.registryUrl());
+        params.put("registrySecretStored", kafka.registryCredentials() != null);
         params.put(
                 "account",
                 kafka.credentials() == null ? null : kafka.credentials().username());
@@ -180,12 +184,30 @@ class KafkaRegistrar implements ClusterRegistrar {
         KafkaConnection kafka = (KafkaConnection) connection;
         String servers = String.join(",", bootstrapOf(kafka));
         String clientId = blankToNull(kafka.clientId());
+        byte[] sealedOrEmpty = sealRegistry(clusterId, kafka);
+        // The column stays null. An empty blob would be rewrapped as a credential.
+        byte[] sealed = sealedOrEmpty.length == 0 ? null : sealedOrEmpty;
         connections
                 .findById(clusterId)
                 .ifPresentOrElse(
-                        existing -> existing.change(servers, kafka.securityProtocol(), kafka.saslMechanism(), clientId),
+                        existing -> existing.change(
+                                servers,
+                                kafka.securityProtocol(),
+                                kafka.saslMechanism(),
+                                clientId,
+                                kafka.registryKind(),
+                                kafka.registryUrl(),
+                                sealed),
                         () -> connections.save(new KafkaConnectionEntity(
-                                clusterId, servers, kafka.securityProtocol(), kafka.saslMechanism(), clientId)));
+                                        clusterId, servers, kafka.securityProtocol(), kafka.saslMechanism(), clientId)
+                                .withRegistry(kafka.registryKind(), kafka.registryUrl(), sealed)));
+    }
+
+    private byte[] sealRegistry(UUID clusterId, KafkaConnection kafka) {
+        if (KafkaOptions.REGISTRY_NONE.equals(kafka.registryKind()) || kafka.registryCredentials() == null) {
+            return new byte[0];
+        }
+        return registrySecrets.seal(clusterId, kafka.registryCredentials());
     }
 
     @Override
@@ -201,7 +223,10 @@ class KafkaRegistrar implements ClusterRegistrar {
                 account.username(),
                 account.password() != null,
                 account.tlsBundle(),
-                stored.getClientId());
+                stored.getClientId(),
+                stored.getRegistryKind(),
+                stored.getRegistryUrl(),
+                stored.getRegistrySecret() != null);
     }
 
     @Override
@@ -221,10 +246,46 @@ class KafkaRegistrar implements ClusterRegistrar {
         String mechanism = mechanismOf(edit, stored);
         String bundle = edit.tlsBundle() == null ? account.tlsBundle() : blankToNull(edit.tlsBundle());
         String clientId = edit.clientId() == null ? stored.getClientId() : blankToNull(edit.clientId());
+        Registry resolvedRegistry = resolveRegistry(clusterId, edit, stored);
         ResolvedAccount resolved = resolveAccount(edit, stored, account, servers, protocol, mechanism);
         KafkaConnection connection = new KafkaConnection(
-                KafkaModule.SYSTEM, servers, protocol, mechanism, resolved.credentials(), bundle, clientId);
+                KafkaModule.SYSTEM,
+                servers,
+                protocol,
+                mechanism,
+                resolved.credentials(),
+                bundle,
+                clientId,
+                resolvedRegistry.kind(),
+                resolvedRegistry.url(),
+                resolvedRegistry.credentials());
         return new Resolved(validated(connection), resolved.toStore());
+    }
+
+    private record Registry(String kind, String url, String credentials) {}
+
+    /**
+     * A blank credential keeps the stored one. Changing the registry itself requires it again, so a stored credential
+     * is never sent to a registry the cluster did not already use.
+     */
+    private Registry resolveRegistry(UUID clusterId, KafkaConnectionUpdate edit, KafkaConnectionEntity stored) {
+        String kind =
+                edit.registryKind() == null ? stored.getRegistryKind() : KafkaRegistryConfig.kind(edit.registryKind());
+        String url = edit.registryUrl() == null ? stored.getRegistryUrl() : blankToNull(edit.registryUrl());
+        if (KafkaOptions.REGISTRY_NONE.equals(kind)) {
+            return new Registry(kind, null, null);
+        }
+        boolean destinationChanged =
+                !kind.equals(stored.getRegistryKind()) || !Objects.equals(url, stored.getRegistryUrl());
+        String supplied = blankToNull(edit.registryCredentials());
+        if (supplied != null) {
+            return new Registry(kind, url, supplied);
+        }
+        if (destinationChanged && stored.getRegistrySecret() != null) {
+            throw new IllegalArgumentException(
+                    "Enter the registry credential again: the stored one is never sent to a registry the cluster did not already use.");
+        }
+        return new Registry(kind, url, registrySecrets.open(clusterId, stored.getRegistrySecret()));
     }
 
     private static String mechanismOf(KafkaConnectionUpdate edit, KafkaConnectionEntity stored) {
@@ -704,6 +765,7 @@ class KafkaRegistrar implements ClusterRegistrar {
         if (blankToNull(kafka.clientId()) != null) {
             options.put(KafkaOptions.CLIENT_ID, kafka.clientId());
         }
+        KafkaRegistryConfig.put(options, kafka.registryKind(), kafka.registryUrl(), kafka.registryCredentials());
         return options;
     }
 
@@ -751,6 +813,7 @@ class KafkaRegistrar implements ClusterRegistrar {
             requireCredentials(kafka.saslMechanism(), credentials);
         }
         parse(kafka.bootstrapServers());
+        KafkaRegistryConfig.require(kafka.registryKind(), kafka.registryUrl());
         return kafka;
     }
 

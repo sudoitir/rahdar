@@ -1589,7 +1589,13 @@ public class MessageService {
         properties.putAll(m.doubleProperties());
         properties.putAll(m.booleanProperties());
         return new MessageContent(
-                headers, properties, m.body(), m.bodyEncoding() == BodyEncoding.BASE64, m.contentType());
+                headers,
+                properties,
+                m.body(),
+                m.bodyEncoding() == BodyEncoding.BASE64,
+                m.contentType(),
+                m.decoded(),
+                m.decodedKey());
     }
 
     private static MessageSummaryView toSummary(
@@ -1680,6 +1686,8 @@ public class MessageService {
                 GovernanceViews.withheld(g),
                 tombstone,
                 key,
-                keyEncoding == null ? null : keyEncoding.name());
+                keyEncoding == null ? null : keyEncoding.name(),
+                g.decoded(),
+                g.decodedKey());
     }
 }

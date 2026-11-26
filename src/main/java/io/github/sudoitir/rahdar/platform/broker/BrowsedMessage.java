@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,7 +27,60 @@ public record BrowsedMessage(
         Map<String, Long> intProperties,
         Map<String, Long> longProperties,
         Map<String, Double> doubleProperties,
-        Map<String, Boolean> booleanProperties) {
+        Map<String, Boolean> booleanProperties,
+        DecodedRecordView decoded,
+        DecodedRecordView decodedKey) {
+
+    /** A message whose payload was not passed to a schema registry. */
+    public BrowsedMessage(
+            long messageId,
+            int type,
+            boolean durable,
+            int priority,
+            long timestamp,
+            long expiration,
+            long size,
+            String groupId,
+            String correlationId,
+            String replyTo,
+            String userId,
+            String body,
+            BodyEncoding bodyEncoding,
+            BodyDecoder.Compression bodyCompression,
+            String contentType,
+            boolean bodyTruncated,
+            Integer observedLimitBytes,
+            Map<String, String> stringProperties,
+            Map<String, Long> intProperties,
+            Map<String, Long> longProperties,
+            Map<String, Double> doubleProperties,
+            Map<String, Boolean> booleanProperties) {
+        this(
+                messageId,
+                type,
+                durable,
+                priority,
+                timestamp,
+                expiration,
+                size,
+                groupId,
+                correlationId,
+                replyTo,
+                userId,
+                body,
+                bodyEncoding,
+                bodyCompression,
+                contentType,
+                bodyTruncated,
+                observedLimitBytes,
+                stringProperties,
+                intProperties,
+                longProperties,
+                doubleProperties,
+                booleanProperties,
+                null,
+                null);
+    }
 
     public int propertyCount() {
         return stringProperties.size()
@@ -62,7 +116,9 @@ public record BrowsedMessage(
                 intProperties,
                 Map.copyOf(extended),
                 doubleProperties,
-                booleanProperties);
+                booleanProperties,
+                decoded,
+                decodedKey);
     }
 
     /** The same message with one more boolean property, such as a log record that is a tombstone. */
@@ -91,7 +147,38 @@ public record BrowsedMessage(
                 intProperties,
                 longProperties,
                 doubleProperties,
-                Map.copyOf(extended));
+                Map.copyOf(extended),
+                decoded,
+                decodedKey);
+    }
+
+    /** The same message with its key decoded by the key binding. */
+    public BrowsedMessage withDecodedKey(DecodedRecordView decodedKey) {
+        return new BrowsedMessage(
+                messageId,
+                type,
+                durable,
+                priority,
+                timestamp,
+                expiration,
+                size,
+                groupId,
+                correlationId,
+                replyTo,
+                userId,
+                body,
+                bodyEncoding,
+                bodyCompression,
+                contentType,
+                bodyTruncated,
+                observedLimitBytes,
+                stringProperties,
+                intProperties,
+                longProperties,
+                doubleProperties,
+                booleanProperties,
+                decoded,
+                decodedKey);
     }
 
     /** First ~200 chars of the body, for the grid cell. */

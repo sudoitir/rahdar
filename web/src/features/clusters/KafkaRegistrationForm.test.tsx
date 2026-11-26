@@ -290,4 +290,35 @@ describe('KafkaRegistrationForm', () => {
       connection: { system: 'kafka', bootstrapServers: ['k1:9092', 'k2:9092'], securityProtocol: 'PLAINTEXT' },
     });
   });
+
+  it('asks for a registry URL with a Confluent registry, and clears that once the kind is none', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<KafkaRegistrationForm />);
+    await user.click(screen.getByRole('combobox', { name: 'Schema registry' }));
+    await user.click(await screen.findByRole('option', { name: 'Confluent-compatible' }));
+    expect(screen.getByRole('textbox', { name: 'Registry URL' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Check connection' }));
+    expect(await screen.findByText('Enter the registry URL, or set the registry kind to none.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Schema registry' }));
+    await user.click(await screen.findByRole('option', { name: 'None' }));
+    expect(screen.queryByRole('textbox', { name: 'Registry URL' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Enter the registry URL, or set the registry kind to none.')).not.toBeInTheDocument();
+  });
+
+  it('refuses a registry URL without a scheme, and clears that once the URL is http or https', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<KafkaRegistrationForm />);
+    await user.click(screen.getByRole('combobox', { name: 'Schema registry' }));
+    await user.click(await screen.findByRole('option', { name: 'Confluent-compatible' }));
+    const url = screen.getByRole('textbox', { name: 'Registry URL' });
+    await user.type(url, 'registry:8081');
+    await user.tab();
+    expect(await screen.findByText('registryUrl must be an http or https URL.')).toBeInTheDocument();
+
+    await user.clear(url);
+    await user.type(url, 'https://registry:8081');
+    expect(screen.queryByText('registryUrl must be an http or https URL.')).not.toBeInTheDocument();
+  });
 });

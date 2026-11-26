@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.governance;
 
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage.Redaction;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage.Withheld;
 import java.math.BigInteger;
@@ -76,7 +77,9 @@ final class PolicyEngine {
                 governed.redactions(),
                 governed.withheld(),
                 Collections.unmodifiableMap(sealable),
-                governed.policyVersion());
+                governed.policyVersion(),
+                governed.decoded(),
+                governed.decodedKey());
     }
 
     /** Detectors only, for free text such as audit parameters: no rules, no findings, never clear. */
@@ -122,7 +125,39 @@ final class PolicyEngine {
                     List.copyOf(redactions),
                     List.copyOf(withheld),
                     Map.of(),
-                    policy.version());
+                    policy.version(),
+                    decoded(content.decoded()),
+                    decoded(content.decodedKey()));
+        }
+
+        /** The decoded record, with each field masked by the body rule that names its path. */
+        private DecodedRecordView decoded(DecodedRecordView view) {
+            if (view == null || !view.decoded()) {
+                return view;
+            }
+            Object masked = walk(view.record(), "");
+            String serialized = mapper.writeValueAsString(masked);
+            return new DecodedRecordView(
+                    view.type(), view.schemaId(), view.subject(), masked, null, serialized, paths(masked));
+        }
+
+        private Map<String, String> paths(Object node) {
+            Map<String, String> out = new LinkedHashMap<>();
+            flatten(node, "", out);
+            return out;
+        }
+
+        private void flatten(Object node, String path, Map<String, String> out) {
+            if (node instanceof Map<?, ?> object) {
+                object.forEach((key, value) -> {
+                    String next = path.isEmpty() ? String.valueOf(key) : path + "." + key;
+                    flatten(value, next, out);
+                });
+            } else if (node instanceof List<?> list) {
+                list.forEach(value -> flatten(value, path + "[*]", out));
+            } else if (!path.isEmpty() && node != null) {
+                out.put(path, String.valueOf(node));
+            }
         }
 
         /** A typed value: governed as text, and kept with its type when nothing about it changed. */

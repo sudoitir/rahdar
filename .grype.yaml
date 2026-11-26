@@ -1,0 +1,15 @@
+# Findings the image scan may ignore. Everything else still fails the build.
+#
+# Grype reads ../.grype.yaml from its working directory, and the scan step mounts the repository at
+# /workdir, so this file is picked up with no flag in ci.yml.
+#
+# An entry is temporary and carries the date it was added, the fixed version, and why that version
+# cannot ship yet. Remove the entry once the fix is available; the scan is then the check again.
+ignore:
+  # Added 2026-11-26. Fixed in Tomcat 11.0.30, which is not on Maven Central (the newest 11.x there
+  # is 11.0.29) and which no Spring Boot 4.1.x manages (4.1.3 still manages 11.0.27). The image
+  # therefore cannot carry the fix at all. Remove when 11.0.30 is published, raise tomcat.version,
+  # and let the scan prove it.
+  - vulnerability: CVE-2026-133325
+    package:
+      name: tomcat-embed-core

@@ -75,6 +75,7 @@ final class ClusterDisplays {
         if (k.credentials() != null && k.credentials().username() != null) {
             rows.add(DisplayRow.of(LABEL_ACCOUNT, k.credentials().username()));
         }
+        registryRows(rows, k.registryKind(), k.registryUrl(), k.registryCredentials() != null);
     }
 
     private static void rabbitMqRows(List<DisplayRow> rows, RabbitMqConnection r) {
@@ -130,6 +131,23 @@ final class ClusterDisplays {
         if (k.credentials() != null) {
             addIfSet(rows, LABEL_ACCOUNT, k.credentials().username());
             rows.add(DisplayRow.of(LABEL_ACCOUNT_SECRET, REDACTED_PASSWORD));
+        }
+        addIfSet(rows, "Schema registry", k.registryKind());
+        addIfSet(rows, "Schema registry URL", k.registryUrl());
+        if (k.registryCredentials() != null && !k.registryCredentials().isBlank()) {
+            rows.add(DisplayRow.of("Schema registry credential", REDACTED_PASSWORD));
+        }
+    }
+
+    private static void registryRows(List<DisplayRow> rows, String kind, String url, boolean credential) {
+        if (kind != null && !"none".equals(kind)) {
+            rows.add(DisplayRow.of("Schema registry", kind));
+            if (url != null) {
+                rows.add(DisplayRow.of("Schema registry URL", url));
+            }
+            if (credential) {
+                rows.add(DisplayRow.of("Schema registry credential", REDACTED_PASSWORD));
+            }
         }
     }
 

@@ -133,6 +133,8 @@ qa-up name port demo="": mounts
     files=(-f deploy/compose/dev/compose.dev.yaml)
     [ -z "{{demo}}" ] || files+=(-f deploy/compose/dev/compose.demo.yaml)
     files+=(-f deploy/compose/dev/compose.isolated.yaml)
+    # A schema registry beside the stack's Kafka, so the registry screens have something to show.
+    files+=(-f deploy/compose/dev/compose.qa-registry.yaml)
     [ -z "{{demo}}" ] || files+=(-f deploy/compose/dev/compose.isolated-demo.yaml)
     # QA_JAR runs a jar built on the host in the released runtime image, instead of building the image.
     build=--build
@@ -172,6 +174,15 @@ qa-up name port demo="": mounts
 qa-down name:
     docker compose -p rahdar-qa-{{name}} down -v --remove-orphans
     rm -rf web/.sweep/auth
+
+# Drive the schema-registry flows against a stack `just qa-up` left running. Not part of qa-up or CI.
+# just qa-flows schema 18081
+[group('develop')]
+qa-flows name port:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "→ schema flows against rahdar-qa-{{name}} at http://127.0.0.1:{{port}}"
+    RAHDAR=http://127.0.0.1:{{port}} node --experimental-strip-types web/scripts/schema-flows.ts
 
 # Sizes come from load/profiles/<profile>.env and any LOAD_* variable; LOAD_IMAGE or LOAD_JAR picks the Rahdar build
 # (else the Dockerfile is built). The stack is project rahdar-load on 127.0.0.1:18090, removed with its volumes.

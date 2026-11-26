@@ -47,6 +47,8 @@ const UNIVERSE = [
   'settings:read',
   'settings:write',
   'team:admin',
+  'schema:read',
+  'schema:write',
   'transaction:abort',
   'transaction:read',
   'token:admin',

@@ -43,7 +43,11 @@ export function KafkaConnectionForm({
   const [confirming, setConfirming] = useState(false);
 
   const form = useForm<Fields>({
-    initialValues: { ...kafkaFieldsOf(stored), name: cluster.name, description: cluster.description ?? '' },
+    initialValues: {
+      ...kafkaFieldsOf(stored, cluster.connection?.kafka?.registrySecretStored ?? false),
+      name: cluster.name,
+      description: cluster.description ?? '',
+    },
     validateInputOnBlur: true,
     validate: (values) => ({
       ...kafkaProblems(values, stored),
@@ -69,7 +73,7 @@ export function KafkaConnectionForm({
       ...result,
       alreadyRegistered: result.alreadyRegistered?.id === cluster.id ? null : result.alreadyRegistered,
     });
-  const credentials = secretRequired(f, stored) || f.password !== '' || f.token !== '';
+  const credentials = secretRequired(f, stored) || f.password !== '' || f.token !== '' || f.registryCredentials !== '';
 
   function reason(): string | null {
     if (passed) return null;
@@ -92,6 +96,7 @@ export function KafkaConnectionForm({
         notify.succeeded({ action: SAVE, subject: `the connection of ${cluster.name}` });
         form.setFieldValue('password', '');
         form.setFieldValue('token', '');
+        form.setFieldValue('registryCredentials', '');
         form.resetDirty();
         check.reset();
         setCheckedFor(null);

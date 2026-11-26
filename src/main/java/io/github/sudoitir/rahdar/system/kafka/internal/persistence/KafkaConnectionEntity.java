@@ -33,16 +33,41 @@ public class KafkaConnectionEntity {
     @Column(name = "client_id")
     private String clientId;
 
+    @Column(name = "registry_kind", nullable = false)
+    private String registryKind;
+
+    @Column(name = "registry_url")
+    private String registryUrl;
+
+    /** The vault envelope. Never copied onto a DTO, an audit map or a log. */
+    @Column(name = "registry_secret")
+    private byte[] registrySecret;
+
     public KafkaConnectionEntity(
             UUID clusterId, String bootstrapServers, String securityProtocol, String saslMechanism, String clientId) {
         this.clusterId = clusterId;
-        change(bootstrapServers, securityProtocol, saslMechanism, clientId);
+        change(bootstrapServers, securityProtocol, saslMechanism, clientId, "none", null, null);
     }
 
-    public void change(String bootstrapServers, String securityProtocol, String saslMechanism, String clientId) {
+    public KafkaConnectionEntity withRegistry(String kind, String url, byte[] secret) {
+        change(bootstrapServers, securityProtocol, saslMechanism, clientId, kind, url, secret);
+        return this;
+    }
+
+    public void change(
+            String bootstrapServers,
+            String securityProtocol,
+            String saslMechanism,
+            String clientId,
+            String registryKind,
+            String registryUrl,
+            byte[] registrySecret) {
         this.bootstrapServers = bootstrapServers;
         this.securityProtocol = securityProtocol;
         this.saslMechanism = saslMechanism;
         this.clientId = clientId;
+        this.registryKind = registryKind;
+        this.registryUrl = registryUrl;
+        this.registrySecret = registrySecret;
     }
 }

@@ -36,6 +36,9 @@ class StoreCoverageTest extends PostgresIntegrationTest {
             Map.entry(
                     "kafka_reassignment",
                     "current state: one row per replica move in progress, removed when the move finishes"),
+            Map.entry(
+                    "kafka_schema_binding",
+                    "configuration: one row per topic side, at most two per topic, removed with its cluster"),
             Map.entry("rabbitmq_connection", "configuration: one row per RabbitMQ cluster, removed with its cluster"),
             Map.entry(
                     "rabbitmq_health",

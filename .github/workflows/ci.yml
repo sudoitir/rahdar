@@ -457,13 +457,17 @@ jobs:
       - name: Scan the image
         run: |
           mkdir -p "$RUNNER_TEMP/grype"
+          # .grype.yaml holds the findings that may be ignored, each with the version that fixes it
+          # and why that version cannot ship yet. It is passed explicitly: the grype image has no
+          # shell to change into a directory, and its own working directory is /tmp.
           grype() {
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$RUNNER_TEMP/grype:/cache" -e GRYPE_DB_CACHE_DIR=/cache \
+              -v "$GITHUB_WORKSPACE/.grype.yaml:/grype.yaml:ro" \
               anchore/grype:v0.119.0@sha256:8c2c9234a345577a6d321a4753aa3ee1276d8975c8452d2344a56b57733ecad3 \
-              rahdar:ci "$@"
+              -c /grype.yaml rahdar:ci "$@"
           }
-          echo "Every finding:"; grype
+          echo "Every finding:"; grype --show-suppressed
           echo "Fixable findings (fails on high or critical):"; grype --only-fixed --fail-on high
 
   # The documentation site builds (ADR-0061 D5). pages.yml deploys it from main.

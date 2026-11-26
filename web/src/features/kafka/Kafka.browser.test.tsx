@@ -14,10 +14,12 @@ import type { ReactNode } from 'react';
 import { axeViolations, contentWidth, Frame, SCHEMES, settle, Themed, type Scheme } from '../../test/browser.tsx';
 import { AclsView } from './AclsView.tsx';
 import { keys, type Acl, type GroupDetail, type GroupSummary, type TopicConfig, type Transaction } from './api.ts';
+import { schemaKeys, type SchemaSubject } from './schemasApi.ts';
 import { BrokersView } from './BrokersView.tsx';
 import { GroupsView } from './GroupsView.tsx';
 import { GroupView } from './GroupView.tsx';
 import { TopicConfigView } from './TopicConfigView.tsx';
+import { SubjectView } from './SubjectView.tsx';
 import { TransactionsView } from './TransactionsView.tsx';
 
 /**
@@ -30,6 +32,25 @@ beforeAll(() => onlineManager.setOnline(false));
 afterAll(() => onlineManager.setOnline(true));
 
 const LONG = 'customer-order-fulfilment-backlog-on-the-eu-west-primary-consumer-group-v2';
+
+const SUBJECT: SchemaSubject = {
+  name: 'orders-value',
+  type: 'AVRO',
+  compatibility: 'BACKWARD',
+  compatibilityNote: null,
+  schemaText: JSON.stringify({
+    type: 'record',
+    name: 'Order',
+    fields: [
+      { name: 'id', type: 'string' },
+      { name: 'total', type: 'double' },
+    ],
+  }),
+  versions: [
+    { id: 7, version: 1, type: 'AVRO', schema: '{}', deleted: false },
+    { id: 8, version: 2, type: 'AVRO', schema: '{}', deleted: true },
+  ],
+};
 
 const exact = (value: number) => ({ value, accuracy: 'EXACT' as const, reason: null, breakdown: false });
 
@@ -160,6 +181,13 @@ const CASES: Case[] = [
     path: '/clusters/k1/kafka/topics/orders/config',
     element: <TopicConfigView />,
     seed: (c) => c.setQueryData(keys.config('k1', 'orders'), CONFIG),
+  },
+  {
+    name: 'a schema subject',
+    route: '/clusters/$clusterId/kafka/schemas/$subject',
+    path: '/clusters/k1/kafka/schemas/orders-value',
+    element: <SubjectView />,
+    seed: (c) => c.setQueryData(schemaKeys.subject('k1', 'orders-value'), SUBJECT),
   },
   {
     name: 'ACLs',

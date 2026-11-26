@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.sql.web;
 
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.RedactionView;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.WithheldView;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -137,7 +138,16 @@ public final class SqlViews {
             List<RedactionView> redactions,
 
             @Schema(description = "Content of this row that was not shown, and why.")
-            List<WithheldView> withheld) {}
+            List<WithheldView> withheld,
+
+            @Schema(
+                    nullable = true,
+                    description =
+                            "The record a schema id decoded to, or why it did not. Null when this row was not decoded.")
+            DecodedRecordView decoded,
+
+            @Schema(nullable = true, description = "The key decoded with the topic's key binding.")
+            DecodedRecordView decodedKey) {}
 
     @Schema(description = "What one node contributed, including nothing and why.")
     public record SqlNodeOutcomeView(

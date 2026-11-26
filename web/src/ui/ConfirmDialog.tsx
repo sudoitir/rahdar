@@ -130,7 +130,14 @@ export function ConfirmDialog({
       closeOnClickOutside={!pending}
     >
       <Stack gap="md" aria-busy={pending}>
-        <Text component="div" size="sm" className={classes.consequence}>
+        <Text
+          component="div"
+          size="sm"
+          className={classes.consequence}
+          tabIndex={0}
+          role="region"
+          aria-label="What this will do"
+        >
           {consequence}
         </Text>
         {controls}
