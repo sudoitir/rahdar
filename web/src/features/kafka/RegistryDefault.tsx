@@ -85,15 +85,9 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
       description="Subjects without their own level follow this. The review shows the current level before anything is written."
     >
       <Stack gap="sm">
-        <DescriptionList
-          label="Registry default compatibility"
-          items={[
-            {
-              term: 'Current',
-              value: applied ?? 'Read in the review, before anything is written.',
-            },
-          ]}
-        />
+        {applied ? (
+          <DescriptionList label="Registry default compatibility" items={[{ term: 'Current', value: applied }]} />
+        ) : null}
         <form noValidate onSubmit={fetchPreview}>
           <FieldRow>
             <Select
@@ -103,7 +97,13 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
               {...form.getInputProps('level')}
             />
             <CapabilityGate verdict={gate} what="setting the registry default">
-              <Button type="submit" disabled={gate.kind === 'blocked'} loading={preview.isPending}>
+              <Button
+                type="submit"
+                variant="default"
+                size="xs"
+                disabled={gate.kind === 'blocked'}
+                loading={preview.isPending}
+              >
                 Review registry default
               </Button>
             </CapabilityGate>

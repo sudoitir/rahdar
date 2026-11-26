@@ -155,7 +155,8 @@ describe('schema subjects', () => {
     const user = userEvent.setup();
     renderAppAt('/clusters/k1/kafka/schemas');
 
-    expect(await screen.findByText('Read in the review, before anything is written.')).toBeInTheDocument();
+    expect(await screen.findByText(/The review shows the current level/)).toBeInTheDocument();
+    expect(screen.queryByText('Read in the review, before anything is written.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: 'New level' }));
     await user.click(await screen.findByRole('option', { name: 'FULL' }));
     await user.click(screen.getByRole('button', { name: 'Review registry default' }));
