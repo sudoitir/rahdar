@@ -9,11 +9,11 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaRegistry;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaPreview;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.VersionView;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.BindingPage;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.BindingRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.CompatibilityRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.DeleteRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.RegisterRequest;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.SchemaBindingPage;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.SchemaBindingRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.SubjectPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.SubjectView;
 import java.util.UUID;
@@ -54,18 +54,18 @@ public class KafkaSchemaController {
     }
 
     @GetMapping("/schemas/bindings")
-    public BindingPage bindings(@PathVariable UUID clusterId) {
-        return new BindingPage(bindings.list(clusterId));
+    public SchemaBindingPage bindings(@PathVariable UUID clusterId) {
+        return new SchemaBindingPage(bindings.list(clusterId));
     }
 
     @PostMapping("/schemas/bindings:preview")
-    public SchemaPreview previewBinding(@PathVariable UUID clusterId, @RequestBody BindingRequest request) {
+    public SchemaPreview previewBinding(@PathVariable UUID clusterId, @RequestBody SchemaBindingRequest request) {
         return bindings.preview(clusterId, request.topic(), request.side(), request.serde());
     }
 
     @HeldResponse
     @PutMapping("/schemas/bindings")
-    public BindingView bind(@PathVariable UUID clusterId, @RequestBody BindingRequest request) {
+    public BindingView bind(@PathVariable UUID clusterId, @RequestBody SchemaBindingRequest request) {
         return bindings.apply(clusterId, request.topic(), request.side(), request.serde(), request.etag());
     }
 

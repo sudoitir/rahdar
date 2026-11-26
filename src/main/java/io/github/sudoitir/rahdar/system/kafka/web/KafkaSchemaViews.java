@@ -53,12 +53,12 @@ public final class KafkaSchemaViews {
     public record DeleteRequest(Boolean permanent) {}
 
     @Schema(name = "SchemaBindingPage", requiredMode = Schema.RequiredMode.REQUIRED)
-    public record BindingPage(
+    public record SchemaBindingPage(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             List<BindingView> items) {}
 
     @Schema(name = "SchemaBindingRequest")
-    public record BindingRequest(
+    public record SchemaBindingRequest(
             String topic,
             String side,
             String serde,
