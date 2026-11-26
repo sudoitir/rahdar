@@ -33,6 +33,19 @@ export interface ReplicationSearch {
 }
 
 /** The replication address's topic filter, kept only when it names one. */
+export interface SchemasSearch {
+  tab?: 'subjects' | 'bindings';
+  q?: string;
+}
+
+/** The open section and the subject filter, each only when it names a value the page knows. */
+export function validateSchemasSearch(raw: Record<string, unknown>): SchemasSearch {
+  const out: SchemasSearch = {};
+  if (raw.tab === 'subjects' || raw.tab === 'bindings') out.tab = raw.tab;
+  if (typeof raw.q === 'string' && raw.q) out.q = raw.q;
+  return out;
+}
+
 export function validateReplicationSearch(raw: Record<string, unknown>): ReplicationSearch {
   const out: ReplicationSearch = {};
   if (typeof raw.topic === 'string' && raw.topic) out.topic = raw.topic;
