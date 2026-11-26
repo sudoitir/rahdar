@@ -40,14 +40,6 @@ const button = (page: Page, name: string) => page.getByRole('button', { name, ex
  */
 const dialog = (page: Page) => page.getByRole('dialog').last();
 
-/** Waits for a dialog's exit to finish, so the next step sees exactly one. */
-const settled = async (page: Page) => {
-  for (let wait = 0; wait < 40; wait++) {
-    if ((await page.getByRole('dialog').count()) <= 1) return;
-    await page.waitForTimeout(50);
-  }
-};
-
 /** Presses and holds a confirm until it fires, as an operator's finger does. A click does not arm it. */
 async function hold(page: Page, name: string) {
   const target = dialog(page).getByRole('button', { name, exact: true });
@@ -58,6 +50,11 @@ async function hold(page: Page, name: string) {
   await page.mouse.down();
   await page.waitForTimeout(2_000);
   await page.mouse.up();
+}
+
+/** The response body of the next call to `path` that the page makes, so an assertion waits on the apply, not a clock. */
+async function answer(page: Page, path: string) {
+  return page.waitForResponse((response) => response.url().includes(path) && response.request().method() !== 'GET');
 }
 
 /** An XSRF token for a request made outside the page, taken from the saved session. */
@@ -155,9 +152,9 @@ try {
   await page.waitForTimeout(400);
   await check('a click does not register', async () => !(await subjects(page, cluster)).includes(subject));
 
+  const applied = answer(page, ':register');
   await hold(page, `Register schema ${subject}`);
-  await page.waitForTimeout(1_500);
-  await settled(page);
+  await check('the register was answered by the server', async () => (await applied).ok());
   await check('the subject now exists', async () => (await subjects(page, cluster)).includes(subject));
   await check('it has one version', async () => (await versions(page, cluster, subject)) === 1);
   await check(
@@ -178,8 +175,9 @@ try {
   await check('the review says it is already registered', async () =>
     /already registered/i.test((await dialog(page).textContent()) ?? ''),
   );
+  const again = answer(page, ':register');
   await hold(page, `Register schema ${subject}`);
-  await page.waitForTimeout(1_500);
+  await again;
   await check('no second version was written', async () => (await versions(page, cluster, subject)) === 1);
 
   // -------------------------------------------------------------------------------------------------------
@@ -193,8 +191,9 @@ try {
   await check('the review names the new level', async () =>
     ((await dialog(page).textContent()) ?? '').includes('FULL'),
   );
+  const levelled = answer(page, ':compatibility');
   await hold(page, `Set compatibility of ${subject}`);
-  await page.waitForTimeout(1_500);
+  await levelled;
   await openSubject(page, cluster, subject);
   await check('the subject now says FULL', async () =>
     ((await page.getByRole('main').textContent()) ?? '').includes('FULL'),
@@ -214,8 +213,9 @@ try {
   const raced = await registerOutside(admin, cluster, subject, schemaV2);
   await check('the other window wrote the second version', async () => raced.status() < 300);
   await check('the review is now stale', async () => (await versions(page, cluster, subject)) === 2);
+  const refused = answer(page, ':register');
   await hold(page, `Register schema ${subject}`);
-  await page.waitForTimeout(1_500);
+  await check('the stale apply was refused as stale', async () => (await refused).status() === 412);
   await check('the stale apply wrote nothing', async () => (await versions(page, cluster, subject)) === 2);
   await check('the review says the registry moved', async () =>
     ((await dialog(page).textContent()) ?? '').includes('The registry moved since this preview'),
@@ -231,8 +231,9 @@ try {
   await page.waitForTimeout(1_000);
   await check('saving a binding previews it first', async () => (await page.getByRole('dialog').count()) > 0);
   if (await page.getByRole('dialog').count()) {
+    const bound = answer(page, '/bindings');
     await hold(page, 'Save binding for orders value');
-    await page.waitForTimeout(1_500);
+    await bound;
     const saved = (await (await page.request.get(`${BASE}${registry(cluster)}/bindings`)).json()) as {
       items: { topic: string; side: string; serde: string }[];
     };
@@ -249,8 +250,9 @@ try {
   await check('the review says the schemas cannot be restored', async () =>
     ((await dialog(page).textContent()) ?? '').includes('cannot be restored'),
   );
+  const removed = answer(page, `/schemas/${subject}`);
   await hold(page, `Permanently delete subject ${subject}`);
-  await page.waitForTimeout(1_500);
+  await check('the delete was answered', async () => (await removed).status() < 300);
   await check('the subject is gone', async () => !(await subjects(page, cluster)).includes(subject));
 
   // -------------------------------------------------------------------------------------------------------
