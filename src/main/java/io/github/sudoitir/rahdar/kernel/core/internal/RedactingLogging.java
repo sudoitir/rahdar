@@ -34,11 +34,7 @@ public class RedactingLogging implements ApplicationListener<ApplicationStarting
 
     /** Idempotent, and also callable by a test that builds a layout without starting Boot. */
     public static void register() {
-        WORDS.forEach((word, supplier) -> {
-            PatternLayout.DEFAULT_CONVERTER_SUPPLIER_MAP.put(word, supplier);
-            PatternLayout.DEFAULT_CONVERTER_MAP.put(
-                    word, supplier.get().getClass().getName());
-        });
+        WORDS.forEach(PatternLayout.DEFAULT_CONVERTER_SUPPLIER_MAP::put);
     }
 
     @Override
