@@ -42,10 +42,10 @@
 
     <properties>
         <java.version>25</java.version>
-        <!-- Above Spring Boot 4.1.2's managed Tomcat, which still ships 11.0.25. That build has
-             critical advisories fixed in 11.0.27 (CVE-2026-76183, CVE-2026-101296, CVE-2026-101356).
-             Drop once the Boot BOM manages 11.0.27 or later; the image scan flags any regression. -->
-        <tomcat.version>11.0.27</tomcat.version>
+        <!-- Above Spring Boot 4.1.2's managed Tomcat, which still ships 11.0.25. 11.0.27 has
+             two critical advisories fixed in 11.0.29 (CVE-2026-116561, CVE-2026-118028).
+             Drop once the Boot BOM manages 11.0.29 or later; the image scan flags any regression. -->
+        <tomcat.version>11.0.29</tomcat.version>
         <!-- Above Spring Boot 4.1.1's managed Jackson 3.1.5 and 2.21.5, which carry three advisories
              (GHSA-gx83-3vf8-gh7j, GHSA-q4xh-88c3-wmh7, GHSA-wjgm-6hv5-3cvf). Drop once the Boot BOM
              manages 3.1.6 and 2.21.6 or later. -->
@@ -151,6 +151,13 @@
                 <groupId>com.squareup.okio</groupId>
                 <artifactId>okio-jvm</artifactId>
                 <version>3.18.1</version>
+            </dependency>
+            <!-- That same utility brings guava 32.0.1-jre through wire-schema, which GHSA-xxph-c9ww-hj94
+                 flags. 33.8.0-jre clears it. Drop once the utility depends on a fixed guava. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.8.0-jre</version>
             </dependency>
             <!-- Spring Boot 4.x no longer manages the Testcontainers versions itself. -->
             <dependency>
