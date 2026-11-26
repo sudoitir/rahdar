@@ -61,7 +61,7 @@ final class KafkaRegistryConfig {
     private static boolean hasUserInfo(String url) {
         try {
             return URI.create(url.strip()).getUserInfo() != null;
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return url.contains("@");
         }
     }

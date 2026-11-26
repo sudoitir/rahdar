@@ -184,7 +184,9 @@ class KafkaRegistrar implements ClusterRegistrar {
         KafkaConnection kafka = (KafkaConnection) connection;
         String servers = String.join(",", bootstrapOf(kafka));
         String clientId = blankToNull(kafka.clientId());
-        byte[] sealed = sealRegistry(clusterId, kafka);
+        byte[] sealedOrEmpty = sealRegistry(clusterId, kafka);
+        // The column stays null. An empty blob would be rewrapped as a credential.
+        byte[] sealed = sealedOrEmpty.length == 0 ? null : sealedOrEmpty;
         connections
                 .findById(clusterId)
                 .ifPresentOrElse(
@@ -197,19 +199,13 @@ class KafkaRegistrar implements ClusterRegistrar {
                                 kafka.registryUrl(),
                                 sealed),
                         () -> connections.save(new KafkaConnectionEntity(
-                                clusterId,
-                                servers,
-                                kafka.securityProtocol(),
-                                kafka.saslMechanism(),
-                                clientId,
-                                kafka.registryKind(),
-                                kafka.registryUrl(),
-                                sealed)));
+                                        clusterId, servers, kafka.securityProtocol(), kafka.saslMechanism(), clientId)
+                                .withRegistry(kafka.registryKind(), kafka.registryUrl(), sealed)));
     }
 
     private byte[] sealRegistry(UUID clusterId, KafkaConnection kafka) {
         if (KafkaOptions.REGISTRY_NONE.equals(kafka.registryKind()) || kafka.registryCredentials() == null) {
-            return null;
+            return new byte[0];
         }
         return registrySecrets.seal(clusterId, kafka.registryCredentials());
     }

@@ -97,7 +97,7 @@ public final class KafkaSchemaViews {
         }
         try {
             return SchemaType.valueOf(raw);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new IllegalArgumentException("type must be one of AVRO, PROTOBUF, JSON.");
         }
     }
@@ -108,7 +108,7 @@ public final class KafkaSchemaViews {
         }
         try {
             return CompatibilityLevel.valueOf(raw);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new IllegalArgumentException(
                     "level must be one of BACKWARD, BACKWARD_TRANSITIVE, FORWARD, FORWARD_TRANSITIVE, FULL, FULL_TRANSITIVE, NONE.");
         }

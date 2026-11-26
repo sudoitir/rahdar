@@ -55,9 +55,9 @@ class KafkaSchemaApprovalTest {
                 mock(AuditService.class),
                 mock(ActorResolver.class));
 
-        assertThatThrownBy(() -> reviews.replay(
-                        new SchemaWriteParams(cluster, "register", "orders-value", "AVRO", "{}", null, null, "then")))
-                .isInstanceOf(StalePreviewException.class);
+        SchemaWriteParams held =
+                new SchemaWriteParams(cluster, "register", "orders-value", "AVRO", "{}", null, null, "then");
+        assertThatThrownBy(() -> reviews.replay(held)).isInstanceOf(StalePreviewException.class);
         verify(catalog, never()).register(any(), any(), any(), any());
     }
 }

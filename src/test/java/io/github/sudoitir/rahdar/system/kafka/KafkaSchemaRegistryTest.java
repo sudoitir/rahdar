@@ -44,8 +44,8 @@ class KafkaSchemaRegistryTest {
         when(connection.unwrap(SchemaCatalog.class)).thenReturn(Optional.of(catalog));
         when(catalog.capability()).thenReturn(Assessment.available("ready"));
         when(connections.findById(CLUSTER))
-                .thenReturn(Optional.of(new KafkaConnectionEntity(
-                        CLUSTER, "k:9092", "PLAINTEXT", null, null, "confluent", "https://r", null)));
+                .thenReturn(Optional.of(new KafkaConnectionEntity(CLUSTER, "k:9092", "PLAINTEXT", null, null)
+                        .withRegistry("confluent", "https://r", null)));
     }
 
     private KafkaSchemaRegistry registry() {
@@ -81,7 +81,8 @@ class KafkaSchemaRegistryTest {
         when(connection.unwrap(SchemaCatalog.class)).thenReturn(Optional.empty());
         when(connection.system()).thenReturn(new BrokerSystem("kafka", "Kafka", "3", 1, Set.of(), List.of()));
 
-        assertThatThrownBy(() -> registry().open(CLUSTER))
+        KafkaSchemaRegistry unavailable = registry();
+        assertThatThrownBy(() -> unavailable.open(CLUSTER))
                 .isInstanceOf(SchemaUnavailableException.class)
                 .hasMessage("This system has no schema registry.");
         when(connection.unwrap(SchemaCatalog.class)).thenReturn(Optional.of(catalog));
@@ -98,10 +99,11 @@ class KafkaSchemaRegistryTest {
                 .thenThrow(broker(Status.UNAVAILABLE, "registry down"))
                 .thenThrow(broker(Status.UNIMPLEMENTED, "not a schema registry"));
 
-        assertThatThrownBy(() -> registry().subjects(CLUSTER, null, null))
+        KafkaSchemaRegistry reading = registry();
+        assertThatThrownBy(() -> reading.subjects(CLUSTER, null, null))
                 .isInstanceOf(SchemaUnavailableException.class)
                 .hasMessage("registry down");
-        assertThatThrownBy(() -> registry().subjects(CLUSTER, null, null))
+        assertThatThrownBy(() -> reading.subjects(CLUSTER, null, null))
                 .isInstanceOf(SchemaUnavailableException.class)
                 .hasMessage("not a schema registry");
     }
@@ -111,7 +113,8 @@ class KafkaSchemaRegistryTest {
         UUID missing = UUID.randomUUID();
         when(connections.findById(missing)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> registry().kind(missing)).isInstanceOf(NotFoundException.class);
+        KafkaSchemaRegistry missingRegistry = registry();
+        assertThatThrownBy(() -> missingRegistry.kind(missing)).isInstanceOf(NotFoundException.class);
         assertThat(KafkaSchemaRegistry.translate("confluent", broker(Status.NOT_FOUND, "missing subject")))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("missing subject");

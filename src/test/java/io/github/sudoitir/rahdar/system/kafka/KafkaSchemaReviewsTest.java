@@ -143,7 +143,7 @@ class KafkaSchemaReviewsTest {
                         .count())
                 .isZero();
         assertThat(version.id()).isEqualTo(7);
-        verify(catalog).register(eq("orders-value"), eq(SchemaType.AVRO), eq("{}"), eq(Precondition.ifMatch("etag-1")));
+        verify(catalog).register("orders-value", SchemaType.AVRO, "{}", Precondition.ifMatch("etag-1"));
     }
 
     @Test
@@ -211,9 +211,9 @@ class KafkaSchemaReviewsTest {
     void aHeldApplyRechecksTheEtag() {
         when(catalog.previewRegister(any(), any(), any())).thenReturn(preview("moved", "ok"));
 
-        assertThatThrownBy(() -> reviews.replay(
-                        new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "then")))
-                .isInstanceOf(StalePreviewException.class);
+        SchemaWriteParams held =
+                new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "then");
+        assertThatThrownBy(() -> reviews.replay(held)).isInstanceOf(StalePreviewException.class);
         verify(catalog, never()).register(any(), any(), any(), any());
     }
 
@@ -222,14 +222,14 @@ class KafkaSchemaReviewsTest {
         String reason = "registry kind 'confluent' is configured but could not be reached";
         BrokerGateway gateway = mock(BrokerGateway.class);
         ClusterConnection connection = mock(ClusterConnection.class);
-        SchemaCatalog catalog = mock(SchemaCatalog.class);
+        SchemaCatalog unreachable = mock(SchemaCatalog.class);
         KafkaConnectionRepository connections = mock(KafkaConnectionRepository.class);
         when(gateway.cluster(CLUSTER)).thenReturn(connection);
-        when(connection.unwrap(SchemaCatalog.class)).thenReturn(Optional.of(catalog));
-        when(catalog.capability()).thenReturn(Assessment.unavailable(reason, Optional.empty()));
+        when(connection.unwrap(SchemaCatalog.class)).thenReturn(Optional.of(unreachable));
+        when(unreachable.capability()).thenReturn(Assessment.unavailable(reason, Optional.empty()));
         when(connections.findById(CLUSTER))
-                .thenReturn(Optional.of(new KafkaConnectionEntity(
-                        CLUSTER, "k:9092", "PLAINTEXT", null, null, "confluent", "https://r", null)));
+                .thenReturn(Optional.of(new KafkaConnectionEntity(CLUSTER, "k:9092", "PLAINTEXT", null, null)
+                        .withRegistry("confluent", "https://r", null)));
         KafkaSchemaRegistry registry = new KafkaSchemaRegistry(gateway, connections, mock(ClusterAccessGuard.class));
 
         assertThatThrownBy(() -> registry.catalog(CLUSTER))
@@ -286,7 +286,7 @@ class KafkaSchemaReviewsTest {
                 .isInstanceOf(ConflictException.class);
         verify(audit).inDoubt(any(), argThat(KafkaSchemaReviewsTest::redacted));
         verify(audit, never()).fail(any(), any());
-        verify(catalog).delete(eq("orders-value"), eq(true), eq(Precondition.ifMatch("etag-1")));
+        verify(catalog).delete("orders-value", true, Precondition.ifMatch("etag-1"));
     }
 
     @Test
@@ -300,9 +300,9 @@ class KafkaSchemaReviewsTest {
                         reviews.previewDelete(CLUSTER, "orders-value", true).etag());
         assertThatThrownBy(() -> reviews.delete(CLUSTER, "orders-value", true, soft))
                 .isInstanceOf(StalePreviewException.class);
-        assertThatThrownBy(() -> reviews.replay(
-                        new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, true, soft)))
-                .isInstanceOf(StalePreviewException.class);
+        SchemaWriteParams permanent =
+                new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, true, soft);
+        assertThatThrownBy(() -> reviews.replay(permanent)).isInstanceOf(StalePreviewException.class);
         verify(catalog, never()).delete(any(), anyBoolean(), any());
         verify(audit, never()).begin(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
@@ -314,7 +314,7 @@ class KafkaSchemaReviewsTest {
 
         reviews.delete(CLUSTER, "orders-value", true, etag);
 
-        verify(catalog).delete(eq("orders-value"), eq(true), eq(Precondition.ifMatch("etag-1")));
+        verify(catalog).delete("orders-value", true, Precondition.ifMatch("etag-1"));
         verify(audit).finish(any(), eq(false), eq(1L), any(), any());
     }
 
@@ -382,8 +382,7 @@ class KafkaSchemaReviewsTest {
         assertThat(view.before()).containsExactly("owner=billing");
         assertThat(applied).isEqualTo(CompatibilityLevel.BACKWARD);
         verify(catalog, times(2))
-                .setCompatibility(
-                        eq("orders-value"), eq(CompatibilityLevel.BACKWARD), eq(Precondition.ifMatch("etag-1")));
+                .setCompatibility("orders-value", CompatibilityLevel.BACKWARD, Precondition.ifMatch("etag-1"));
         verify(audit, times(2)).finish(any(), eq(false), eq(1L), any(), any());
     }
 
@@ -400,8 +399,7 @@ class KafkaSchemaReviewsTest {
         assertThat(view.subject()).isNull();
         assertThat(view.action()).isEqualTo("default-compatibility");
         assertThat(applied).isEqualTo(CompatibilityLevel.NONE);
-        verify(catalog, times(2))
-                .setCompatibilityDefault(eq(CompatibilityLevel.NONE), eq(Precondition.ifMatch("etag-1")));
+        verify(catalog, times(2)).setCompatibilityDefault(CompatibilityLevel.NONE, Precondition.ifMatch("etag-1"));
         verify(audit, times(2))
                 .begin(
                         any(),

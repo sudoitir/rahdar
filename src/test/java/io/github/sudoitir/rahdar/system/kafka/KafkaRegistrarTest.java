@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -574,7 +573,7 @@ class KafkaRegistrarTest {
                 .save(argThat(row -> "confluent".equals(row.getRegistryKind())
                         && Arrays.equals(new byte[] {3}, row.getRegistrySecret())));
         verify(registrySecrets).seal(id, "user:secret");
-        verify(registrySecrets, never()).seal(eq(id), eq(null));
+        verify(registrySecrets, never()).seal(id, null);
     }
 
     @Test
@@ -592,15 +591,8 @@ class KafkaRegistrarTest {
     private UUID storedConfluent() {
         UUID id = UUID.randomUUID();
         when(connections.findById(id))
-                .thenReturn(Optional.of(new KafkaConnectionEntity(
-                        id,
-                        "k1:9092",
-                        KafkaOptions.PLAINTEXT,
-                        null,
-                        null,
-                        "confluent",
-                        "https://registry.example",
-                        new byte[] {9})));
+                .thenReturn(Optional.of(new KafkaConnectionEntity(id, "k1:9092", KafkaOptions.PLAINTEXT, null, null)
+                        .withRegistry("confluent", "https://registry.example", new byte[] {9})));
         when(settings.coreSettings(id)).thenReturn(new CoreConnectionSettings(id, null, null, null, false));
         return id;
     }

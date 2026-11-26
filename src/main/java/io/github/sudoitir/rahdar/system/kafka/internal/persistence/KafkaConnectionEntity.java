@@ -45,20 +45,13 @@ public class KafkaConnectionEntity {
 
     public KafkaConnectionEntity(
             UUID clusterId, String bootstrapServers, String securityProtocol, String saslMechanism, String clientId) {
-        this(clusterId, bootstrapServers, securityProtocol, saslMechanism, clientId, "none", null, null);
+        this.clusterId = clusterId;
+        change(bootstrapServers, securityProtocol, saslMechanism, clientId, "none", null, null);
     }
 
-    public KafkaConnectionEntity(
-            UUID clusterId,
-            String bootstrapServers,
-            String securityProtocol,
-            String saslMechanism,
-            String clientId,
-            String registryKind,
-            String registryUrl,
-            byte[] registrySecret) {
-        this.clusterId = clusterId;
-        change(bootstrapServers, securityProtocol, saslMechanism, clientId, registryKind, registryUrl, registrySecret);
+    public KafkaConnectionEntity withRegistry(String kind, String url, byte[] secret) {
+        change(bootstrapServers, securityProtocol, saslMechanism, clientId, kind, url, secret);
+        return this;
     }
 
     public void change(

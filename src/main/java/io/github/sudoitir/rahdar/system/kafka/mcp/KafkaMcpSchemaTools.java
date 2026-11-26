@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.system.kafka.mcp;
 
+import io.github.sudoitir.openbroker.messaging.Cursor;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaBindings;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class KafkaMcpSchemaTools {
 
     private static final String CLUSTER_ID = "clusterId";
+    private static final String SUBJECT = "subject";
 
     private final KafkaSchemaRegistry registry;
     private final KafkaSchemaReviews reviews;
@@ -45,7 +47,7 @@ public class KafkaMcpSchemaTools {
             var page = registry.subjects(id, cursor, q);
             return new KafkaSchemaViews.SubjectPage(
                     page.items().stream().map(KafkaSchemaViews::row).toList(),
-                    page.next().map(c -> c.token()).orElse(null));
+                    page.next().map(Cursor::token).orElse(null));
         });
     }
 
@@ -61,7 +63,7 @@ public class KafkaMcpSchemaTools {
     public McpSchema.CallToolResult kafkaSchemaSubject(
             @McpToolParam(required = true) String clusterId, @McpToolParam(required = true) String subject) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("subject", subject);
+        McpArgs.required(SUBJECT, subject);
         return McpErrors.guard(() -> KafkaSchemaViews.subject(registry.subject(id, subject)));
     }
 
@@ -83,7 +85,7 @@ public class KafkaMcpSchemaTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("subject", subject);
+        McpArgs.required(SUBJECT, subject);
         boolean dry = McpArgs.flag(dryRun, true);
         if (!dry) {
             McpArgs.required("etag", etag);
@@ -146,7 +148,7 @@ public class KafkaMcpSchemaTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("subject", subject);
+        McpArgs.required(SUBJECT, subject);
         boolean dry = McpArgs.flag(dryRun, true);
         boolean hard = Boolean.TRUE.equals(permanent);
         if (!dry) {

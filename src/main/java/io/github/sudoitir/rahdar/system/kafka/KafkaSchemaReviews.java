@@ -48,6 +48,11 @@ public class KafkaSchemaReviews {
     private static final String CHECK_ON_APPLY = "The compatibility check happens on apply.";
     private static final String SCHEMA = "SCHEMA";
     private static final String APPLIED = "APPLIED";
+    private static final String REGISTER = "register";
+    private static final String COMPATIBILITY = "compatibility";
+    private static final String DEFAULT_COMPATIBILITY = "default-compatibility";
+    private static final String DELETE = "delete";
+    private static final String STATUS = "status";
 
     private final KafkaSchemaRegistry registries;
     private final ClusterAccessGuard access;
@@ -97,7 +102,7 @@ public class KafkaSchemaReviews {
     public VersionView register(UUID clusterId, String subject, SchemaType type, String schema, String etag) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         return gated(
-                new SchemaWriteParams(clusterId, "register", subject, type.name(), schema, null, null, etag),
+                new SchemaWriteParams(clusterId, REGISTER, subject, type.name(), schema, null, null, etag),
                 () -> runRegister(clusterId, subject, type, schema, etag));
     }
 
@@ -108,7 +113,7 @@ public class KafkaSchemaReviews {
     public CompatibilityLevel setCompatibility(UUID clusterId, String subject, CompatibilityLevel level, String etag) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         return gated(
-                new SchemaWriteParams(clusterId, "compatibility", subject, null, null, level.name(), null, etag),
+                new SchemaWriteParams(clusterId, COMPATIBILITY, subject, null, null, level.name(), null, etag),
                 () -> runCompatibility(clusterId, subject, level, etag));
     }
 
@@ -119,7 +124,7 @@ public class KafkaSchemaReviews {
     public CompatibilityLevel setDefault(UUID clusterId, CompatibilityLevel level, String etag) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         return gated(
-                new SchemaWriteParams(clusterId, "default-compatibility", null, null, null, level.name(), null, etag),
+                new SchemaWriteParams(clusterId, DEFAULT_COMPATIBILITY, null, null, null, level.name(), null, etag),
                 () -> runDefault(clusterId, level, etag));
     }
 
@@ -129,7 +134,7 @@ public class KafkaSchemaReviews {
 
     public void delete(UUID clusterId, String subject, boolean permanent, String etag) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
-        gated(new SchemaWriteParams(clusterId, "delete", subject, null, null, null, permanent, etag), () -> {
+        gated(new SchemaWriteParams(clusterId, DELETE, subject, null, null, null, permanent, etag), () -> {
             runDelete(clusterId, subject, permanent, etag);
             return null;
         });
@@ -142,12 +147,12 @@ public class KafkaSchemaReviews {
 
     public void replay(SchemaWriteParams p) {
         switch (p.action()) {
-            case "register" ->
+            case REGISTER ->
                 runRegister(p.clusterId(), p.subject(), SchemaType.valueOf(p.schemaType()), p.schema(), p.etag());
-            case "compatibility" ->
+            case COMPATIBILITY ->
                 runCompatibility(p.clusterId(), p.subject(), CompatibilityLevel.valueOf(p.level()), p.etag());
-            case "default-compatibility" -> runDefault(p.clusterId(), CompatibilityLevel.valueOf(p.level()), p.etag());
-            case "delete" -> runDelete(p.clusterId(), p.subject(), Boolean.TRUE.equals(p.permanent()), p.etag());
+            case DEFAULT_COMPATIBILITY -> runDefault(p.clusterId(), CompatibilityLevel.valueOf(p.level()), p.etag());
+            case DELETE -> runDelete(p.clusterId(), p.subject(), Boolean.TRUE.equals(p.permanent()), p.etag());
             default -> throw new IllegalArgumentException("Unknown schema action.");
         }
     }
@@ -159,12 +164,12 @@ public class KafkaSchemaReviews {
 
     private SchemaPreview previewOf(SchemaWriteParams p) {
         return switch (p.action()) {
-            case "register" ->
+            case REGISTER ->
                 previewRegister(p.clusterId(), p.subject(), SchemaType.valueOf(p.schemaType()), p.schema());
-            case "compatibility" ->
+            case COMPATIBILITY ->
                 previewCompatibility(p.clusterId(), p.subject(), CompatibilityLevel.valueOf(p.level()));
-            case "default-compatibility" -> previewDefault(p.clusterId(), CompatibilityLevel.valueOf(p.level()));
-            case "delete" -> previewDelete(p.clusterId(), p.subject(), Boolean.TRUE.equals(p.permanent()));
+            case DEFAULT_COMPATIBILITY -> previewDefault(p.clusterId(), CompatibilityLevel.valueOf(p.level()));
+            case DELETE -> previewDelete(p.clusterId(), p.subject(), Boolean.TRUE.equals(p.permanent()));
             default -> throw new IllegalArgumentException("Unknown schema action.");
         };
     }
@@ -209,7 +214,7 @@ public class KafkaSchemaReviews {
                         clusterId,
                         catalog ->
                                 catalog.setCompatibility(subject, level, Precondition.ifMatch(issued.driverEtag()))));
-        audit.finish(event, false, 1, null, Map.of("compatibility", applied.name(), "status", APPLIED));
+        audit.finish(event, false, 1, null, Map.of(COMPATIBILITY, applied.name(), STATUS, APPLIED));
         return applied;
     }
 
@@ -230,7 +235,7 @@ public class KafkaSchemaReviews {
                 () -> registries.call(
                         clusterId,
                         catalog -> catalog.setCompatibilityDefault(level, Precondition.ifMatch(issued.driverEtag()))));
-        audit.finish(event, false, 1, null, Map.of("compatibility", applied.name(), "status", APPLIED));
+        audit.finish(event, false, 1, null, Map.of(COMPATIBILITY, applied.name(), STATUS, APPLIED));
         return applied;
     }
 
@@ -252,31 +257,31 @@ public class KafkaSchemaReviews {
                     catalog.delete(subject, permanent, Precondition.ifMatch(issued.driverEtag()));
                     return null;
                 }));
-        audit.finish(event, false, 1, null, Map.of("permanent", permanent, "status", APPLIED));
+        audit.finish(event, false, 1, null, Map.of("permanent", permanent, STATUS, APPLIED));
     }
 
     private Issued loadRegister(UUID clusterId, String subject, SchemaType type, String schema) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview driver = registries.call(clusterId, catalog -> catalog.previewRegister(subject, type, schema));
-        return issued(subject, "register", "register", driver);
+        return issued(subject, REGISTER, REGISTER, driver);
     }
 
     private Issued loadCompatibility(UUID clusterId, String subject, CompatibilityLevel level) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview driver = registries.call(clusterId, catalog -> catalog.previewCompatibility(subject, level));
-        return issued(subject, "compatibility", "compatibility", driver);
+        return issued(subject, COMPATIBILITY, COMPATIBILITY, driver);
     }
 
     private Issued loadDefault(UUID clusterId, CompatibilityLevel level) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview driver = registries.call(clusterId, catalog -> catalog.previewCompatibilityDefault(level));
-        return issued(null, "default-compatibility", "default-compatibility", driver);
+        return issued(null, DEFAULT_COMPATIBILITY, DEFAULT_COMPATIBILITY, driver);
     }
 
     private Issued loadDelete(UUID clusterId, String subject, boolean permanent) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview driver = registries.call(clusterId, catalog -> catalog.previewDelete(subject, permanent));
-        Issued issued = issued(subject, "delete", permanent ? "permanent" : "soft", driver);
+        Issued issued = issued(subject, DELETE, permanent ? "permanent" : "soft", driver);
         SchemaPreview view = issued.view();
         if (permanent) {
             view = withNote(view, PERMANENT_DELETE);
@@ -325,7 +330,7 @@ public class KafkaSchemaReviews {
     }
 
     private static Map<String, Object> after(SubjectVersion version) {
-        return Map.of("id", version.id(), "version", version.version(), "status", APPLIED);
+        return Map.of("id", version.id(), "version", version.version(), STATUS, APPLIED);
     }
 
     static SchemaPreview of(String subject, String action, Preview preview, String reviewEtag) {
@@ -341,10 +346,10 @@ public class KafkaSchemaReviews {
                 note = now;
             } else if ("schema.id".equals(change.key()) && now != null) {
                 existing = Integer.valueOf(now);
-            } else if ("compatibility".equals(change.key())) {
+            } else if (COMPATIBILITY.equals(change.key())) {
                 outcome = now;
-                add(before, "compatibility", was);
-                add(after, "compatibility", now);
+                add(before, COMPATIBILITY, was);
+                add(after, COMPATIBILITY, now);
             } else {
                 add(before, change.key(), was);
                 add(after, change.key(), now);

@@ -92,11 +92,11 @@ class KafkaGatedOperationsTest {
 
     @Test
     void anApproverSeesWhetherASchemaDeleteIsPermanent() {
-        List<DisplayRow> permanent = KafkaGatedOperations.schemaRows(
+        List<DisplayRow> permanent = KafkaSchemaGatedOperations.schemaRows(
                 clusters, new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, true, "e"));
-        List<DisplayRow> soft = KafkaGatedOperations.schemaRows(
+        List<DisplayRow> soft = KafkaSchemaGatedOperations.schemaRows(
                 clusters, new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, false, "e"));
-        List<DisplayRow> level = KafkaGatedOperations.schemaRows(
+        List<DisplayRow> level = KafkaSchemaGatedOperations.schemaRows(
                 clusters,
                 new SchemaWriteParams(CLUSTER, "compatibility", "orders-value", null, null, "BACKWARD", null, "e"));
 
@@ -117,8 +117,9 @@ class KafkaGatedOperationsTest {
                 new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "e");
         BindingParams bind = new BindingParams(CLUSTER, "orders", "value", "avro", "e");
 
-        GatedOperation<SchemaWriteParams> write = beans.schemaWrite(reviews, clusters);
-        GatedOperation<BindingParams> binding = beans.schemaBinding(bindings, clusters);
+        KafkaSchemaGatedOperations schemaBeans = new KafkaSchemaGatedOperations();
+        GatedOperation<SchemaWriteParams> write = schemaBeans.schemaWrite(reviews, clusters);
+        GatedOperation<BindingParams> binding = schemaBeans.schemaBinding(bindings, clusters);
         write.replay(params);
         binding.replay(bind);
 

@@ -26,6 +26,7 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.Compatibility
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.DeleteRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.RegisterRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.SchemaBindingRequest;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews.SubjectRow;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,7 +59,7 @@ class KafkaSchemaControllerTest {
         var empty = KafkaSchemaViews.subject(new Subject("gone", List.of(), Optional.empty(), Optional.empty()));
 
         assertThat(page.next()).isEqualTo("next");
-        assertThat(page.items()).extracting(row -> row.name()).containsExactly("orders-value", "payments-value");
+        assertThat(page.items()).extracting(SubjectRow::name).containsExactly("orders-value", "payments-value");
         assertThat(page.items().getFirst().compatibility()).isEqualTo("BACKWARD");
         assertThat(page.items().get(1).compatibility()).isNull();
         assertThat(empty.type()).isNull();
@@ -96,10 +97,12 @@ class KafkaSchemaControllerTest {
                         .register(CLUSTER, new RegisterRequest("orders-value", "PROTOBUF", "syntax", "etag-1"))
                         .id())
                 .isEqualTo(1);
-        assertThatThrownBy(() -> controller.previewRegister(CLUSTER, new RegisterRequest("s", "XML", "{}", null)))
+        RegisterRequest unknownType = new RegisterRequest("s", "XML", "{}", null);
+        RegisterRequest blankType = new RegisterRequest("s", " ", "{}", null);
+        assertThatThrownBy(() -> controller.previewRegister(CLUSTER, unknownType))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AVRO, PROTOBUF, JSON");
-        assertThatThrownBy(() -> controller.previewRegister(CLUSTER, new RegisterRequest("s", " ", "{}", null)))
+        assertThatThrownBy(() -> controller.previewRegister(CLUSTER, blankType))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AVRO, PROTOBUF, JSON");
         verify(reviews, never()).previewRegister(eq(CLUSTER), eq("s"), any(), any());
@@ -123,10 +126,12 @@ class KafkaSchemaControllerTest {
                 .isSameAs(preview);
         assertThat(controller.setDefault(CLUSTER, new CompatibilityRequest("NONE", "etag-1")))
                 .isEqualTo(CompatibilityLevel.NONE);
-        assertThatThrownBy(() -> controller.setDefault(CLUSTER, new CompatibilityRequest("MAYBE", "etag-1")))
+        CompatibilityRequest unknownLevel = new CompatibilityRequest("MAYBE", "etag-1");
+        CompatibilityRequest blankLevel = new CompatibilityRequest(" ", null);
+        assertThatThrownBy(() -> controller.setDefault(CLUSTER, unknownLevel))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BACKWARD");
-        assertThatThrownBy(() -> controller.previewDefault(CLUSTER, new CompatibilityRequest(" ", null)))
+        assertThatThrownBy(() -> controller.previewDefault(CLUSTER, blankLevel))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("level is required.");
         verify(reviews, never()).setDefault(eq(CLUSTER), isNull(), any());

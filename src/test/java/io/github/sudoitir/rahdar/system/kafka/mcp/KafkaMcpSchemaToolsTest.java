@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 class KafkaMcpSchemaToolsTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
+    private final String clusterId = CLUSTER.toString();
     private static final String SECRET = "registry-secret-value";
 
     private final KafkaSchemaReviews reviews = mock(KafkaSchemaReviews.class);
@@ -47,7 +48,7 @@ class KafkaMcpSchemaToolsTest {
         when(reviews.previewDelete(CLUSTER, "orders-value", true))
                 .thenReturn(preview("This soft-deletes the subject and then deletes the schema."));
 
-        var result = tools.kafkaDeleteSubject(CLUSTER.toString(), "orders-value", true, null, null, null);
+        var result = tools.kafkaDeleteSubject(clusterId, "orders-value", true, null, null, null);
 
         assertThat(result.isError()).isFalse();
         assertThat(result.content().toString()).contains("soft-deletes").doesNotContain(SECRET);
@@ -57,8 +58,7 @@ class KafkaMcpSchemaToolsTest {
 
     @Test
     void aDeleteWithTheEtagAppliesOnce() {
-        var result =
-                tools.kafkaDeleteSubject(CLUSTER.toString(), "orders-value", true, "etag-1", false, "orders-value");
+        var result = tools.kafkaDeleteSubject(clusterId, "orders-value", true, "etag-1", false, "orders-value");
 
         assertThat(result.isError()).isFalse();
         verify(reviews).delete(CLUSTER, "orders-value", true, "etag-1");
@@ -69,8 +69,7 @@ class KafkaMcpSchemaToolsTest {
     void aReadDoesNotNeedAWrite() {
         when(registry.subjects(eq(CLUSTER), any(), any())).thenReturn(new Subjects(List.of(), Optional.empty()));
 
-        assertThat(tools.kafkaSchemaSubjects(CLUSTER.toString(), null, null).isError())
-                .isFalse();
+        assertThat(tools.kafkaSchemaSubjects(clusterId, null, null).isError()).isFalse();
         verify(reviews, never()).previewRegister(any(), any(), any(), any());
     }
 
@@ -95,13 +94,12 @@ class KafkaMcpSchemaToolsTest {
                         Optional.of(CompatibilityLevel.BACKWARD),
                         Optional.empty()));
 
-        var read = tools.kafkaSchemaSubject(CLUSTER.toString(), "orders-value");
+        var read = tools.kafkaSchemaSubject(clusterId, "orders-value");
 
         assertThat(read.isError()).isFalse();
         assertThat(read.content().toString()).contains("orders-value").contains("BACKWARD");
-        assertThatThrownBy(() -> tools.kafkaSchemaSubject(CLUSTER.toString(), " "))
-                .isInstanceOf(McpError.class);
-        verify(registry, never()).subject(eq(CLUSTER), eq(" "));
+        assertThatThrownBy(() -> tools.kafkaSchemaSubject(clusterId, " ")).isInstanceOf(McpError.class);
+        verify(registry, never()).subject(CLUSTER, " ");
     }
 
     @Test
@@ -109,7 +107,7 @@ class KafkaMcpSchemaToolsTest {
         when(registry.subjects(CLUSTER, "c1", "orders"))
                 .thenReturn(new Subjects(List.of(), Optional.of(new Cursor("next-page"))));
 
-        var page = tools.kafkaSchemaSubjects(CLUSTER.toString(), "c1", "orders");
+        var page = tools.kafkaSchemaSubjects(clusterId, "c1", "orders");
 
         assertThat(page.isError()).isFalse();
         assertThat(page.content().toString()).contains("next-page");
@@ -123,19 +121,18 @@ class KafkaMcpSchemaToolsTest {
         when(reviews.register(CLUSTER, "orders-value", SchemaType.AVRO, "{}", "etag-1"))
                 .thenReturn(new VersionView(7, 1, "AVRO", "{}", false));
 
-        var dry = tools.kafkaRegisterSchema(CLUSTER.toString(), "orders-value", "AVRO", "{}", null, null, null);
-        var applied = tools.kafkaRegisterSchema(
-                CLUSTER.toString(), "orders-value", "AVRO", "{}", "etag-1", false, "orders-value");
+        var dry = tools.kafkaRegisterSchema(clusterId, "orders-value", "AVRO", "{}", null, null, null);
+        var applied =
+                tools.kafkaRegisterSchema(clusterId, "orders-value", "AVRO", "{}", "etag-1", false, "orders-value");
 
         assertThat(dry.isError()).isFalse();
         assertThat(dry.content().toString()).contains("Nothing has been written.");
         assertThat(applied.content().toString()).contains("7");
         verify(reviews).register(CLUSTER, "orders-value", SchemaType.AVRO, "{}", "etag-1");
-        assertThatThrownBy(() -> tools.kafkaRegisterSchema(
-                        CLUSTER.toString(), "orders-value", "AVRO", "{}", "etag-1", false, "yes"))
-                .isInstanceOf(McpError.class);
         assertThatThrownBy(() ->
-                        tools.kafkaRegisterSchema(CLUSTER.toString(), "orders-value", "XML", "{}", null, true, null))
+                        tools.kafkaRegisterSchema(clusterId, "orders-value", "AVRO", "{}", "etag-1", false, "yes"))
+                .isInstanceOf(McpError.class);
+        assertThatThrownBy(() -> tools.kafkaRegisterSchema(clusterId, "orders-value", "XML", "{}", null, true, null))
                 .isInstanceOf(McpError.class);
         verify(reviews, times(1)).register(any(), any(), any(), any(), any());
     }
@@ -147,11 +144,10 @@ class KafkaMcpSchemaToolsTest {
         when(reviews.setCompatibility(CLUSTER, "orders-value", CompatibilityLevel.BACKWARD, "etag-1"))
                 .thenReturn(CompatibilityLevel.BACKWARD);
 
-        var dryDefault = tools.kafkaSetSchemaCompatibility(CLUSTER.toString(), "  ", "FULL", null, true, null);
-        var appliedDefault =
-                tools.kafkaSetSchemaCompatibility(CLUSTER.toString(), null, "FULL", "etag-1", false, "default");
+        var dryDefault = tools.kafkaSetSchemaCompatibility(clusterId, "  ", "FULL", null, true, null);
+        var appliedDefault = tools.kafkaSetSchemaCompatibility(clusterId, null, "FULL", "etag-1", false, "default");
         var appliedSubject = tools.kafkaSetSchemaCompatibility(
-                CLUSTER.toString(), "orders-value", "BACKWARD", "etag-1", false, "orders-value");
+                clusterId, "orders-value", "BACKWARD", "etag-1", false, "orders-value");
 
         assertThat(dryDefault.content().toString()).contains("registry default");
         assertThat(appliedDefault.content().toString()).contains("FULL");
@@ -160,11 +156,11 @@ class KafkaMcpSchemaToolsTest {
         verify(reviews, never()).previewCompatibility(any(), any(), any());
         verify(reviews).setDefault(CLUSTER, CompatibilityLevel.FULL, "etag-1");
         verify(reviews).setCompatibility(CLUSTER, "orders-value", CompatibilityLevel.BACKWARD, "etag-1");
-        assertThatThrownBy(() -> tools.kafkaSetSchemaCompatibility(
-                        CLUSTER.toString(), "orders-value", "BACKWARD", "etag-1", false, "no"))
+        assertThatThrownBy(() ->
+                        tools.kafkaSetSchemaCompatibility(clusterId, "orders-value", "BACKWARD", "etag-1", false, "no"))
                 .isInstanceOf(McpError.class);
-        assertThatThrownBy(() -> tools.kafkaSetSchemaCompatibility(
-                        CLUSTER.toString(), "orders-value", "MAYBE", null, true, null))
+        assertThatThrownBy(
+                        () -> tools.kafkaSetSchemaCompatibility(clusterId, "orders-value", "MAYBE", null, true, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BACKWARD");
         verify(reviews, times(1)).setCompatibility(any(), any(), any(), any());
@@ -173,9 +169,8 @@ class KafkaMcpSchemaToolsTest {
     @Test
     void aSoftDeleteSaysDeletedAndAMissingConfirmWritesNothing() {
         when(reviews.previewDelete(CLUSTER, "orders-value", false)).thenReturn(preview("soft"));
-        var applied =
-                tools.kafkaDeleteSubject(CLUSTER.toString(), "orders-value", false, "etag-1", false, "orders-value");
-        var previewed = tools.kafkaDeleteSubject(CLUSTER.toString(), "orders-value", null, null, null, null);
+        var applied = tools.kafkaDeleteSubject(clusterId, "orders-value", false, "etag-1", false, "orders-value");
+        var previewed = tools.kafkaDeleteSubject(clusterId, "orders-value", null, null, null, null);
 
         assertThat(applied.isError()).isFalse();
         assertThat(previewed.isError()).isFalse();
@@ -185,8 +180,7 @@ class KafkaMcpSchemaToolsTest {
                 .doesNotContain("permanently");
         verify(reviews).delete(CLUSTER, "orders-value", false, "etag-1");
         verify(reviews).previewDelete(CLUSTER, "orders-value", false);
-        assertThatThrownBy(() ->
-                        tools.kafkaDeleteSubject(CLUSTER.toString(), "orders-value", true, "etag-1", false, "yes"))
+        assertThatThrownBy(() -> tools.kafkaDeleteSubject(clusterId, "orders-value", true, "etag-1", false, "yes"))
                 .isInstanceOf(McpError.class);
         verify(reviews, never()).delete(any(), any(), eq(true), any());
     }
@@ -197,15 +191,14 @@ class KafkaMcpSchemaToolsTest {
         when(bindings.apply(CLUSTER, "orders", "value", "avro", "etag-1"))
                 .thenReturn(new BindingView("orders", "value", "avro"));
 
-        var dry = tools.kafkaSetSchemaBinding(CLUSTER.toString(), "orders", "value", "avro", null, null, null);
-        var applied =
-                tools.kafkaSetSchemaBinding(CLUSTER.toString(), "orders", "value", "avro", "etag-1", false, "orders");
+        var dry = tools.kafkaSetSchemaBinding(clusterId, "orders", "value", "avro", null, null, null);
+        var applied = tools.kafkaSetSchemaBinding(clusterId, "orders", "value", "avro", "etag-1", false, "orders");
 
         assertThat(dry.content().toString()).contains("bind");
         assertThat(applied.content().toString()).contains("avro");
         verify(bindings).apply(CLUSTER, "orders", "value", "avro", "etag-1");
-        assertThatThrownBy(() -> tools.kafkaSetSchemaBinding(
-                        CLUSTER.toString(), "orders", "value", "avro", "etag-1", false, "yes"))
+        assertThatThrownBy(
+                        () -> tools.kafkaSetSchemaBinding(clusterId, "orders", "value", "avro", "etag-1", false, "yes"))
                 .isInstanceOf(McpError.class);
         verify(bindings, times(1)).apply(any(), any(), any(), any(), any());
     }
