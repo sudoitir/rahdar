@@ -49,7 +49,7 @@ function knownLevel(level: string | null | undefined): string {
  * be scrolled by keyboard, which fails axe's `scrollable-region-focusable`; so the block takes one.
  * It is read-only text, which is why it is a scrollable region with a name rather than a control.
  */
-function SchemaBlock({ name, text }: Readonly<{ name: string; text: string }>) {
+function SchemaBlock({ name, text }: Readonly<{ name: string; text: string | null | undefined }>) {
   return (
     <section>
       <Text size="sm" fw={600} mb="xs">
