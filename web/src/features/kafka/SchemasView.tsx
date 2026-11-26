@@ -15,6 +15,7 @@ import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
+import { RegisterSchemaDialog } from './RegisterSchemaDialog.tsx';
 import { schemaColumns } from './schemaColumns.tsx';
 import { registryReason, schemaWriteGate, useSchemaSubjects } from './schemasApi.ts';
 import type { SchemasSearch } from './search.ts';
@@ -42,6 +43,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
   const subjects = useSchemaSubjects(clusterId, q);
   const { can, loading } = useCan();
   const [draft, setDraft] = useState(q);
+  const [registering, setRegistering] = useState(false);
   const writeQ = useDebouncedCallback((value: string) => {
     void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, q: value || undefined }) });
   }, 250);
@@ -55,7 +57,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
 
   const register = (
     <CapabilityGate verdict={gate} what="registering a schema">
-      <Button size="xs" disabled={gate.kind === 'blocked'} onClick={() => undefined}>
+      <Button size="xs" disabled={gate.kind === 'blocked'} onClick={() => setRegistering(true)}>
         Register a schema
       </Button>
     </CapabilityGate>
@@ -131,6 +133,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
         }
       />
       )}
+      <RegisterSchemaDialog clusterId={clusterId} opened={registering} onClose={() => setRegistering(false)} />
     </>
   );
 }
