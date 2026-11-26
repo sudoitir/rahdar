@@ -33,11 +33,23 @@ export function ReviewSummary({ preview }: Readonly<{ preview: SchemaPreview }>)
       <Lines lines={preview.after ?? []} />
       {preview.statement ? <Text size="sm">{preview.statement}</Text> : null}
       {preview.checkOnApply && preview.note ? <Text size="sm">{preview.note}</Text> : null}
-      {preview.note && preview.note !== preview.statement && !preview.checkOnApply ? (
-        <Text size="sm">{preview.note}</Text>
+      {/* The note is the server's sentence, which may open with the statement already shown, or be the
+          compatibility outcome already listed. Neither is said twice. */}
+      {preview.note && notSaid(preview.note, preview.compatibilityOutcome) && !preview.checkOnApply ? (
+        <Text size="sm">{beyond(preview.note, preview.statement)}</Text>
       ) : null}
     </Stack>
   );
+}
+
+/** The note with the statement it opens with removed, so the two read as one paragraph. */
+function beyond(note: string, statement?: string | null) {
+  if (!statement || !note.startsWith(statement)) return note;
+  return note.slice(statement.length).trim();
+}
+
+function notSaid(note: string, ...said: (string | null | undefined)[]) {
+  return !said.some((text) => text === note);
 }
 
 function Lines({ lines }: Readonly<{ lines: string[] }>) {

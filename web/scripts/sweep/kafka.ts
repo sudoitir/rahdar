@@ -1085,4 +1085,77 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       `subscriptions/${encodeURIComponent(`kafka.group-topic/${LONG_GROUP}/${LONG_GROUP.replaceAll('consumer-group', 'topic')}`)}/messages`,
     ),
   },
+  // The schema registry: the subjects list, one subject, and the bindings. The stack's cluster carries a
+  // registry (compose.qa-registry.yaml) and `kafka_seed_schemas` fills it. The empty, loading and error states
+  // come from the API's own shape, as everywhere else.
+  {
+    area: 'schemas',
+    id: 'subjects',
+    path: kafka('kafka/schemas'),
+    data: [{ path: kafka('kafka/schemas'), empty: { items: [] } }],
+    filter: '?q=' + NO_MATCH,
+    forbidden: true,
+    scenes: [
+      {
+        id: 'registration-review',
+        act: async (page) => {
+          await press(page, 'Register a schema');
+          const dialog = dialogOf(page);
+          await dialog.getByRole('textbox', { name: 'Subject' }).fill('inventory-value');
+          // The schema text sits behind a disclosure, closed by default.
+          await dialog.getByRole('button', { name: 'Schema text' }).click();
+          await dialog
+            .getByRole('textbox', { name: 'Schema' })
+            .fill('{"type":"record","name":"Inventory","fields":[{"name":"sku","type":"string"}]}');
+          await press(page, 'Preview registration');
+          await page.waitForTimeout(800);
+        },
+      },
+    ],
+  },
+  {
+    area: 'schemas',
+    id: 'subject',
+    path: kafka('kafka/schemas/orders-value'),
+    data: [{ path: kafka('kafka/schemas/orders-value') }],
+    forbidden: true,
+    scenes: [
+      {
+        id: 'compatibility-review',
+        act: async (page) => {
+          await press(page, 'Set compatibility');
+          await dialogOf(page).waitFor();
+        },
+      },
+      {
+        id: 'level-preview',
+        act: async (page) => {
+          await press(page, 'Set compatibility');
+          await press(page, 'Preview compatibility');
+          await page.waitForTimeout(800);
+        },
+      },
+      {
+        id: 'permanent-delete-review',
+        act: async (page) => {
+          await press(page, 'Permanently delete');
+          await page.waitForTimeout(800);
+        },
+      },
+      {
+        // A soft delete: the subject stays listed as deleted, and the wording differs from a permanent one.
+        id: 'soft-delete-review',
+        act: async (page) => {
+          await press(page, 'Delete subject');
+          await page.waitForTimeout(800);
+        },
+      },
+    ],
+  },
+  {
+    area: 'schemas',
+    id: 'bindings',
+    path: kafka('kafka/schemas?tab=bindings'),
+    data: [{ path: kafka('kafka/schemas/bindings'), empty: { items: [] } }],
+  },
 ];

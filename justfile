@@ -133,6 +133,8 @@ qa-up name port demo="": mounts
     files=(-f deploy/compose/dev/compose.dev.yaml)
     [ -z "{{demo}}" ] || files+=(-f deploy/compose/dev/compose.demo.yaml)
     files+=(-f deploy/compose/dev/compose.isolated.yaml)
+    # A schema registry beside the stack's Kafka, so the registry screens have something to show.
+    files+=(-f deploy/compose/dev/compose.qa-registry.yaml)
     [ -z "{{demo}}" ] || files+=(-f deploy/compose/dev/compose.isolated-demo.yaml)
     # QA_JAR runs a jar built on the host in the released runtime image, instead of building the image.
     build=--build

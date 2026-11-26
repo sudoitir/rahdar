@@ -208,7 +208,7 @@ for n in 1 2 3; do
 done
 
 say "creating a role and users"
-reader=$(ensure /roles name READER '{"name":"READER","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","subscription:read","message:read"]}')
+reader=$(ensure /roles name READER '{"name":"READER","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","subscription:read","message:read","schema:read"]}')
 long_role="qa-role-with-a-name-that-keeps-going-$(repeat 'and-going-' 8)"
 long_role_id=$(ensure /roles name "$long_role" "{\"name\":\"$long_role\",\"requiresMfa\":false,\"teamAssignable\":false,\"permissions\":[\"cluster:read\"]}")
 long_user="qa-operator-with-an-unreasonably-long-username-$(repeat 'abcdefghij' 4)"
@@ -262,6 +262,7 @@ if [ -n "${COMPOSE:-}" ]; then
     echo "  the Kafka cluster is registered already"
   fi
   kafka_seed_long
+  kafka_seed_schemas
   # The read-only account reads the Kafka cluster too: its forbidden captures are a refusal inside the cluster, not a
   # cluster that does not exist for it.
   api POST "/users/$reader_id/grants" -d "{\"roleId\":\"$reader\",\"scopeType\":\"CLUSTER\",\"scopeId\":\"$(find_id /clusters name events)\"}" -o /dev/null || true

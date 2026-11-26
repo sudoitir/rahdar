@@ -25,6 +25,11 @@ An operator without `schema:write` SHALL see the actions disabled, naming the pe
 - **WHEN** an operator previews a schema registration and does not confirm
 - **THEN** the subject is unchanged
 
+#### Scenario: The registration form says what is missing
+
+- **WHEN** an operator submits a registration with no schema text, while the schema text is closed behind its disclosure
+- **THEN** the disclosure opens, the message appears on the schema field, and focus moves to it
+
 #### Scenario: Confirming a compatibility change
 
 - **WHEN** an operator previews a compatibility change, confirms with press-and-hold, and a policy does not hold it

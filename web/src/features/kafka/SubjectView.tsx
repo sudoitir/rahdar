@@ -185,7 +185,9 @@ export function SubjectView() {
             <Text size="sm" fw={600} mb="xs">
               Schema
             </Text>
-            <pre className={classes.schema}>{data.schemaText ?? 'This subject has no schema text.'}</pre>
+            <pre className={classes.schema} tabIndex={0} role="region" aria-label={`Schema of ${name}`}>
+              {data.schemaText ?? 'This subject has no schema text.'}
+            </pre>
           </section>
           <Group>
             <CapabilityGate verdict={gate} what="setting compatibility">
@@ -263,11 +265,13 @@ export function SubjectView() {
         confirmLabel={deleteTitle}
         tone="danger"
         lead={
-          <Text size="sm">
-            {permanent
-              ? `This soft-deletes subject ${name} and then deletes the schema. The schemas cannot be restored.`
-              : `This hides subject ${name} from the default list. It stays readable as a deleted subject, and it cannot be undone from here.`}
-          </Text>
+          /* A permanent delete's consequence is the preview's own note; a soft delete has none, so say its effect. */
+          permanent ? undefined : (
+            <Text size="sm">
+              This hides subject {name} from the default list. It stays readable as a deleted subject, and it cannot be
+              undone from here.
+            </Text>
+          )
         }
         preview={shown}
         pending={remove.isPending}

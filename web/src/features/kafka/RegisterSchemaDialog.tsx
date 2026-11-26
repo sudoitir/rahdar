@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Select, Stack, Text, Textarea, TextInput } from '@mantine/core';
+import { Select, Stack, Text, Textarea, TextInput, UnstyledButton } from '@mantine/core';
+import { IconChevronRight } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
@@ -7,6 +8,7 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
 import { SchemaReview } from './SchemaReview.tsx';
+import classes from './Schemas.module.css';
 import {
   SCHEMA_TYPES,
   SCHEMA_TYPE_LABEL,
@@ -31,6 +33,8 @@ export function RegisterSchemaDialog({
   const register = useRegister(clusterId);
   const [shown, setShown] = useState<SchemaPreview | null>(null);
   const [applied, setApplied] = useState<SchemaVersion | null>(null);
+  // Closed by default: the form identifies the subject and the type, and the schema text follows.
+  const [expanded, setExpanded] = useState(false);
 
   const form = useForm({
     initialValues: { subject: '', type: 'AVRO', schema: '' },
@@ -50,13 +54,21 @@ export function RegisterSchemaDialog({
     onClose();
   };
 
-  const fetchPreview = form.onSubmit((values) => {
-    register.reset();
-    preview.mutate(
-      { subject: values.subject.trim(), type: values.type, schema: values.schema },
-      { onSuccess: setShown },
-    );
-  }, focusFirstInvalid(form.getInputNode));
+  const fetchPreview = form.onSubmit(
+    (values) => {
+      register.reset();
+      preview.mutate(
+        { subject: values.subject.trim(), type: values.type, schema: values.schema },
+        { onSuccess: setShown },
+      );
+    },
+    // A rejected submit puts the message on its field, so the field has to be showing. The schema text is
+    // closed by default, and a message inside a collapsed window is one the operator cannot read.
+    (errors) => {
+      if (errors.schema) setExpanded(true);
+      focusFirstInvalid(form.getInputNode)(errors);
+    },
+  );
 
   const run = () => {
     if (!shown?.etag) return;
@@ -101,14 +113,40 @@ export function RegisterSchemaDialog({
                 allowDeselect={false}
                 {...form.getInputProps('type')}
               />
-              <Textarea
-                label="Schema"
-                description="The schema text. For example, an Avro record."
-                autosize
-                minRows={6}
-                spellCheck={false}
-                {...form.getInputProps('schema')}
-              />
+              <Stack gap={4}>
+                <UnstyledButton
+                  onClick={() => setExpanded((open) => !open)}
+                  aria-expanded={expanded}
+                  aria-controls="register-schema-text"
+                  className={classes.disclosure}
+                >
+                  <IconChevronRight
+                    size={14}
+                    className={`${classes.chevron} ${expanded ? classes.chevronOpen : ''}`}
+                    aria-hidden
+                  />
+                  <Text size="sm" fw={500}>
+                    Schema text
+                  </Text>
+                </UnstyledButton>
+                {expanded ? (
+                  <Textarea
+                    id="register-schema-text"
+                    label="Schema"
+                    description="The schema text. For example, an Avro record."
+                    autosize
+                    minRows={6}
+                    spellCheck={false}
+                    {...form.getInputProps('schema')}
+                  />
+                ) : (
+                  <Text size="xs" c="dimmed">
+                    {form.values.schema.trim()
+                      ? `${form.values.schema.trim().length} characters entered.`
+                      : 'Not entered yet.'}
+                  </Text>
+                )}
+              </Stack>
               {preview.isError ? <ErrorState variant="inline" error={preview.error} /> : null}
             </Stack>
           </form>
