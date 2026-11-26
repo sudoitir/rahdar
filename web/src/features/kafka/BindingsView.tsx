@@ -26,13 +26,12 @@ import {
 } from './schemasApi.ts';
 
 const SAVE: ActionVerb = { verb: 'Save', past: 'Saved', progressive: 'Saving' };
-const NAMED = 'named';
 
+/** The serdes this installation runs. A name outside this set is not offered. */
 const SERDE_CHOICES = [
   { value: 'avro', label: 'Avro' },
   { value: 'protobuf', label: 'Protobuf' },
   { value: 'json', label: 'JSON Schema' },
-  { value: NAMED, label: 'A named serde' },
 ];
 
 const SIDES = [
@@ -50,7 +49,8 @@ function bindingColumns(): Column<SchemaBinding>[] {
 
 /**
  * Which serde decodes a topic's key or value. Saving previews, then is confirmed by holding:
- * it overwrites the binding. The named field says the installation runs only the serdes it ships.
+ * it overwrites the binding. The choice is Avro, Protobuf or JSON Schema: those are the serdes this
+ * installation runs. A custom name is not offered.
  */
 export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
   const cluster = useCluster(clusterId);
@@ -66,17 +66,15 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
   const rows = bindings.data?.items ?? [];
 
   const form = useForm({
-    initialValues: { topic: '', side: 'value', choice: 'avro', name: '' },
+    initialValues: { topic: '', side: 'value', choice: 'avro' },
     validateInputOnBlur: true,
     validate: {
       topic: (value) => (value.trim() ? null : 'Enter the topic name.'),
       side: (value) => (value === 'key' || value === 'value' ? null : 'Choose key or value.'),
-      name: (value, values) =>
-        values.choice !== NAMED || value.trim() ? null : 'Enter the serde name this installation runs.',
     },
   });
 
-  const serde = form.values.choice === NAMED ? form.values.name.trim() : form.values.choice;
+  const serde = form.values.choice;
   const where = `${form.values.topic.trim()} ${form.values.side}`;
 
   const close = () => {
@@ -88,8 +86,7 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
 
   const fetchPreview = form.onSubmit((values) => {
     apply.reset();
-    const chosen = values.choice === NAMED ? values.name.trim() : values.choice;
-    preview.mutate({ topic: values.topic.trim(), side: values.side, serde: chosen }, { onSuccess: setShown });
+    preview.mutate({ topic: values.topic.trim(), side: values.side, serde: values.choice }, { onSuccess: setShown });
   }, focusFirstInvalid(form.getInputNode));
 
   const run = () => {
@@ -135,14 +132,13 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
         <FieldRow>
           <TextInput label="Topic" {...form.getInputProps('topic')} />
           <Select label="Side" data={SIDES} allowDeselect={false} {...form.getInputProps('side')} />
-          <Select label="Serde" data={SERDE_CHOICES} allowDeselect={false} {...form.getInputProps('choice')} />
-          {form.values.choice === NAMED ? (
-            <TextInput
-              label="Serde name"
-              description="This installation runs only the serdes it ships."
-              {...form.getInputProps('name')}
-            />
-          ) : null}
+          <Select
+            label="Serde"
+            description="Avro, Protobuf or JSON Schema."
+            data={SERDE_CHOICES}
+            allowDeselect={false}
+            {...form.getInputProps('choice')}
+          />
           <CapabilityGate verdict={gate} what="saving a binding">
             <Button type="submit" disabled={gate.kind === 'blocked'} loading={preview.isPending}>
               Save binding

@@ -71,14 +71,17 @@ describe('schema bindings', () => {
     expect(calls[1].body).toMatchObject({ topic: 'orders', side: 'value', serde: 'avro', etag: 'b1' });
   });
 
-  it('says a named serde runs only if the installation ships it', async () => {
+  it('offers Avro, Protobuf and JSON Schema, and no custom name', async () => {
     serve();
     const user = userEvent.setup();
     renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
 
     await user.click(await screen.findByRole('combobox', { name: 'Serde' }));
-    await user.click(await screen.findByRole('option', { name: 'A named serde' }));
-    expect(screen.getByText('This installation runs only the serdes it ships.')).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Avro' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Protobuf' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'JSON Schema' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'A named serde' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Serde name' })).not.toBeInTheDocument();
   });
 
   it('keeps Save visible without schema:write and names that permission', async () => {
