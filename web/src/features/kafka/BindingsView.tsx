@@ -162,7 +162,7 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
           <EmptyState
             kind="empty"
             title="No bindings"
-            description="A binding names the serde that decodes one topic's key or value. Without one, a payload that carries a schema id stays undecoded."
+            description="A binding overrides the serde for one topic's key or value. Decode reads the schema id and uses the schema's type; a binding only overrides that serde."
           />
         }
       />

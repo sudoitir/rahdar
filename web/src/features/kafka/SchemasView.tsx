@@ -87,7 +87,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
         end={
           <>
             {rows.length > 0 || filtered || gate.kind === 'blocked' || subjects.isPending ? register : null}
-            {unavailable ? null : subjects.hasNextPage ? (
+            {subjects.isSuccess && !unavailable && subjects.hasNextPage ? (
               <Button
                 size="xs"
                 variant="default"
@@ -96,11 +96,12 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
               >
                 Load more subjects
               </Button>
-            ) : (
+            ) : null}
+            {subjects.isSuccess && !unavailable && !subjects.hasNextPage ? (
               <Text size="xs" c="dimmed">
                 {rows.length === 1 ? '1 subject' : `${rows.length} subjects`}
               </Text>
-            )}
+            ) : null}
           </>
         }
       />

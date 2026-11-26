@@ -119,6 +119,7 @@ export function RegisterSchemaDialog({
         onClose={close}
         title={`Register schema ${subject}`}
         confirmLabel={`Register schema ${subject}`}
+        tone="danger"
         preview={shown}
         pending={register.isPending}
         stale={register.error?.status === 412}

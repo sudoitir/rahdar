@@ -54,8 +54,8 @@ function Lines({ lines }: Readonly<{ lines: string[] }>) {
 }
 
 /**
- * The same summary for a preview and its result. Register and compatibility confirm with a click.
- * A delete or a binding save is held. A 412 says the registry moved and offers a fresh preview.
+ * The same summary for a preview and its result. Register, compatibility and delete confirm by holding:
+ * a click does nothing. A 412 says the registry moved and offers a fresh preview.
  */
 export function SchemaReview({
   opened,

@@ -70,7 +70,8 @@ describe('a schema subject', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete subject' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete subject orders-value' });
-    expect(dialog).toHaveTextContent('It can be restored.');
+    expect(dialog).toHaveTextContent('hides subject orders-value from the default list');
+    expect(dialog).toHaveTextContent('cannot be undone from here');
     expect(dialog).toHaveTextContent('Nothing has been written.');
 
     const hold = screen.getByRole('button', { name: 'Delete subject orders-value' });

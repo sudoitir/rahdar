@@ -116,6 +116,7 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
         onClose={close}
         title="Set registry default compatibility"
         confirmLabel="Set registry default compatibility"
+        tone="danger"
         preview={shown}
         pending={apply.isPending}
         stale={stale}

@@ -61,7 +61,8 @@ function UnavailableNotice({ clusterId, reason }: Readonly<{ clusterId: string; 
 
 /**
  * One subject: its type, compatibility and versions, the schema text, and the actions that change it.
- * Delete is a soft delete and can be restored. Permanently delete soft-deletes and then deletes the schema.
+ * A soft delete hides the subject from the default list; it cannot be undone from here.
+ * Permanently delete soft-deletes and then deletes the schema.
  */
 export function SubjectView() {
   const { clusterId, subject } = useParams({ strict: false }) as { clusterId: string; subject: string };
@@ -246,6 +247,7 @@ export function SubjectView() {
         onClose={close}
         title={levelTitle}
         confirmLabel={levelTitle}
+        tone="danger"
         preview={shown}
         pending={setLevel.isPending}
         stale={stale}
@@ -264,7 +266,7 @@ export function SubjectView() {
           <Text size="sm">
             {permanent
               ? `This soft-deletes subject ${name} and then deletes the schema. The schemas cannot be restored.`
-              : `This is a soft delete of subject ${name}. It can be restored.`}
+              : `This hides subject ${name} from the default list. It stays readable as a deleted subject, and it cannot be undone from here.`}
           </Text>
         }
         preview={shown}

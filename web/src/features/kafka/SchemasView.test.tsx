@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { holdButton } from '../../test/hold.ts';
 import { renderAppAt } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { mockKafkaCluster } from '../../test/kafkaCluster.ts';
@@ -161,7 +162,10 @@ describe('schema subjects', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Set registry default compatibility' });
     expect(dialog).toHaveTextContent('compatibility=BACKWARD');
     expect(dialog).toHaveTextContent('Nothing has been written.');
-    await user.click(screen.getByRole('button', { name: 'Set registry default compatibility' }));
+    const hold = within(dialog).getByRole('button', { name: 'Set registry default compatibility' });
+    await user.click(hold);
+    expect(calls.map((call) => call.path)).toEqual(['preview']);
+    await holdButton(hold);
 
     await waitFor(() => expect(calls.map((call) => call.path)).toEqual(['preview', 'apply']));
     expect(calls[1].body).toMatchObject({ level: 'FULL', etag: 'd1' });
