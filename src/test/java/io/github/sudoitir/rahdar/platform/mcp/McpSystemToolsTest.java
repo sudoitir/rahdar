@@ -149,7 +149,13 @@ class McpSystemToolsTest {
                         "kafka_reassign",
                         "kafka_list_reassignments",
                         "kafka_preview_cancel_reassignment",
-                        "kafka_cancel_reassignment");
+                        "kafka_cancel_reassignment",
+                        "kafka_schema_subjects",
+                        "kafka_schema_subject",
+                        "kafka_register_schema",
+                        "kafka_set_schema_compatibility",
+                        "kafka_delete_subject",
+                        "kafka_set_schema_binding");
     }
 
     @Test
