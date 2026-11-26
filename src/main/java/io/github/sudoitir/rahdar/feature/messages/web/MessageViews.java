@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.RedactionView;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.WithheldView;
@@ -121,7 +122,12 @@ public final class MessageViews {
                     nullable = true,
                     allowableValues = {"TEXT", "BASE64"},
                     description = "How key is written; null with no key.")
-            String keyEncoding) {}
+            String keyEncoding,
+
+            @Schema(
+                    nullable = true,
+                    description = "The record a schema id decoded to, or why it did not. Never an empty stand-in.")
+            DecodedRecordView decoded) {}
 
     /** A page of messages: the shared list envelope plus the node it was read from. */
     public record MessagePageView(

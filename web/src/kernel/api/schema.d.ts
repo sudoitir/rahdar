@@ -9234,6 +9234,18 @@ export interface components {
       /** @description Inclusive offsets before offset that are still to deliver, as ranges such as 10 or 10-12.14. Absent when the next read just continues at offset. */
       pending?: string | null;
     };
+    DecodedRecordView: {
+      type?: string;
+      /** Format: int32 */
+      schemaId?: number;
+      subject?: string;
+      record?: unknown;
+      reason?: string;
+      serialized?: string;
+      paths?: {
+        [key: string]: string;
+      };
+    };
     MessageDetailView: {
       /** @description The message's position on its node, opaque. */
       position: string;
@@ -9291,6 +9303,8 @@ export interface components {
        * @enum {string|null}
        */
       keyEncoding?: 'TEXT' | 'BASE64' | null;
+      /** @description The record a schema id decoded to, or why it did not. Never an empty stand-in. */
+      decoded?: components['schemas']['DecodedRecordView'] | null;
     };
     /** @description Who has access to one subscription or destination through teams: its owner and every share. */
     ResourceAccessView: {

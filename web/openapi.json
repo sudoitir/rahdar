@@ -47692,6 +47692,34 @@
         },
         "required" : [ "offset", "partition" ]
       },
+      "DecodedRecordView" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "schemaId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "subject" : {
+            "type" : "string"
+          },
+          "record" : { },
+          "reason" : {
+            "type" : "string"
+          },
+          "serialized" : {
+            "type" : "string"
+          },
+          "paths" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "MessageDetailView" : {
         "type" : "object",
         "properties" : {
@@ -47812,6 +47840,14 @@
             "type" : [ "string", "null" ],
             "description" : "How key is written; null with no key.",
             "enum" : [ "TEXT", "BASE64", null ]
+          },
+          "decoded" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/DecodedRecordView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The record a schema id decoded to, or why it did not. Never an empty stand-in."
           }
         },
         "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "position", "priority", "redactions", "size", "stringProperties", "tombstone", "type", "withheld" ]

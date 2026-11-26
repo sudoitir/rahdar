@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.governance;
 
+import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import java.util.Map;
 
 /**
@@ -11,7 +12,21 @@ import java.util.Map;
  * @param base64 the body is binary, carried as base64
  */
 public record MessageContent(
-        Map<String, String> headers, Map<String, Object> properties, String body, boolean base64, String contentType) {
+        Map<String, String> headers,
+        Map<String, Object> properties,
+        String body,
+        boolean base64,
+        String contentType,
+        DecodedRecordView decoded) {
+
+    public MessageContent(
+            Map<String, String> headers,
+            Map<String, Object> properties,
+            String body,
+            boolean base64,
+            String contentType) {
+        this(headers, properties, body, base64, contentType, null);
+    }
 
     public MessageContent {
         headers = headers == null ? Map.of() : headers;

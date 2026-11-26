@@ -6,6 +6,7 @@ import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.Status;
+import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.Count;
@@ -47,6 +48,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -68,9 +71,17 @@ public class BrokerMessages {
     private static final String RECEIVE_PURPOSE = "receive messages over";
 
     private final BrokerGateway gateway;
+    private final SchemaBindingLookup bindings;
 
     public BrokerMessages(BrokerGateway gateway) {
         this.gateway = gateway;
+        this.bindings = (cluster, topic, side) -> null;
+    }
+
+    @Autowired
+    public BrokerMessages(BrokerGateway gateway, ObjectProvider<SchemaBindingLookup> bindings) {
+        this.gateway = gateway;
+        this.bindings = bindings.getIfAvailable(() -> (cluster, topic, side) -> null);
     }
 
     /** One page of a queue on a node, 1-based, with the broker's own count of the queue. */
@@ -115,10 +126,13 @@ public class BrokerMessages {
                 }
                 throw e;
             }
+            SchemaCatalog catalog = c.unwrap(SchemaCatalog.class).orElse(null);
+            String topic = log.name();
+            SchemaDecoding decoding = new SchemaDecoding(catalog, bindings.serde(clusterId, topic, "value"));
             Within<LogPage.LogRecord> kept = within(result.messages(), m -> {
                 BrowsedMessages.Key key = BrowsedMessages.keyOf(m);
                 return new LogPage.LogRecord(
-                        BrowsedMessages.of(m),
+                        BrowsedMessages.of(m, decoding),
                         m.body().isTombstone(),
                         key == null ? null : key.text(),
                         key == null ? null : key.encoding());

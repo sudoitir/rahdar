@@ -7,6 +7,7 @@ import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
+import io.github.sudoitir.rahdar.platform.broker.SchemaBindingLookup;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaPreview;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaSchemaBindingEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaSchemaBindingRepository;
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
-public class KafkaSchemaBindings {
+public class KafkaSchemaBindings implements SchemaBindingLookup {
 
     /** The serdes the driver registers. A class name is refused rather than loaded. */
     static final Set<String> SERDES = Set.of("avro", "protobuf", "json");
@@ -42,6 +43,11 @@ public class KafkaSchemaBindings {
     public record BindingView(String topic, String side, String serde) {}
 
     public record BindingParams(UUID clusterId, String topic, String side, String serde, String etag) {}
+
+    @Override
+    public String serde(UUID clusterId, String topic, String side) {
+        return current(clusterId, topic, side);
+    }
 
     public List<BindingView> list(UUID clusterId) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);

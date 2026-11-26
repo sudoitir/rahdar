@@ -149,7 +149,8 @@ public class SqlGovernance {
                 ints,
                 longs,
                 doubles,
-                booleans);
+                booleans,
+                g.decoded());
     }
 
     /**
