@@ -7,10 +7,7 @@ import java.util.Set;
 /** The schema-registry fields of a Kafka connection, checked and copied onto the driver's options. */
 final class KafkaRegistryConfig {
 
-    /** Stored, and checked, even though the current driver only connects a Confluent registry. */
-    static final String GLUE = "glue";
-
-    static final Set<String> KINDS = Set.of(KafkaOptions.REGISTRY_NONE, KafkaOptions.REGISTRY_CONFLUENT, GLUE);
+    static final Set<String> KINDS = Set.of(KafkaOptions.REGISTRY_NONE, KafkaOptions.REGISTRY_CONFLUENT);
 
     private KafkaRegistryConfig() {}
 
@@ -18,21 +15,17 @@ final class KafkaRegistryConfig {
         return given == null || given.isBlank() ? KafkaOptions.REGISTRY_NONE : given;
     }
 
-    /** Refuses a kind, a Confluent URL or a Glue region the driver cannot use. Never echoes a credential. */
-    static void require(String kind, String url, String region, String registry) {
+    /** Refuses a kind or a Confluent URL the driver cannot use. Never echoes a credential. */
+    static void require(String kind, String url) {
         String resolved = kind(kind);
         if (!KINDS.contains(resolved)) {
-            throw new IllegalArgumentException("registryKind must be one of none, confluent, glue.");
+            throw new IllegalArgumentException("registryKind must be one of none, confluent.");
         }
         if (KafkaOptions.REGISTRY_CONFLUENT.equals(resolved) && blank(url) == null) {
             throw new IllegalArgumentException("registryUrl is required when the registry kind is confluent.");
         }
         if (KafkaOptions.REGISTRY_CONFLUENT.equals(resolved) && !isHttp(url)) {
             throw new IllegalArgumentException("registryUrl must be an http or https URL.");
-        }
-        if (GLUE.equals(resolved) && (blank(region) == null || blank(registry) == null)) {
-            throw new IllegalArgumentException(
-                    "registryGlueRegion and registryGlueRegistry are required when the registry kind is glue.");
         }
     }
 

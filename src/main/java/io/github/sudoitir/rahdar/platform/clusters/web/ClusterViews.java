@@ -355,12 +355,10 @@ public interface ClusterViews {
 
             @Schema(
                     requiredMode = REQUIRED,
-                    allowableValues = {"none", "confluent", "glue"})
+                    allowableValues = {"none", "confluent"})
             String registryKind,
 
             @Schema(nullable = true) String registryUrl,
-            @Schema(nullable = true) String registryGlueRegion,
-            @Schema(nullable = true) String registryGlueRegistry,
 
             @Schema(
                     requiredMode = REQUIRED,

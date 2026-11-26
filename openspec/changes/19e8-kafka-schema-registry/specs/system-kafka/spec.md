@@ -9,10 +9,10 @@ The Kafka namespace SHALL include a registry screen. An operator with `schema:re
 - **WHEN** an operator opens the registry screen of a cluster with no registry
 - **THEN** the screen is visible, registration, compatibility and delete are disabled, and the reason says the cluster has no registry
 
-#### Scenario: An operation Glue does not offer
+#### Scenario: An operation the registry does not offer
 
-- **WHEN** an operator opens a Glue registry that does not offer one operation the screen shows
-- **THEN** that operation is disabled with Glue's reason, and the subjects Glue does return are listed
+- **WHEN** an operator opens a registry that does not offer one operation the screen shows
+- **THEN** that operation is disabled with the registry's reason, and the subjects it does return are listed
 
 ### Requirement: A schema change is previewed, held and audited
 
@@ -53,7 +53,7 @@ An operator without `schema:write` SHALL see the actions disabled, naming the pe
 #### Scenario: A permanent delete preview writes nothing
 
 - **WHEN** an operator previews a permanent delete and does not confirm
-- **THEN** the subject is unchanged and the preview says the schemas cannot be restored
+- **THEN** the subject is unchanged, and the preview says it soft-deletes the subject and then deletes the schema, that the schemas cannot be restored, and that nothing has been written
 
 #### Scenario: A click on the hold does not apply
 

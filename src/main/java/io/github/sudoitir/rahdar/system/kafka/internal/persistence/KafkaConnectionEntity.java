@@ -39,19 +39,13 @@ public class KafkaConnectionEntity {
     @Column(name = "registry_url")
     private String registryUrl;
 
-    @Column(name = "registry_glue_region")
-    private String registryGlueRegion;
-
-    @Column(name = "registry_glue_registry")
-    private String registryGlueRegistry;
-
     /** The vault envelope. Never copied onto a DTO, an audit map or a log. */
     @Column(name = "registry_secret")
     private byte[] registrySecret;
 
     public KafkaConnectionEntity(
             UUID clusterId, String bootstrapServers, String securityProtocol, String saslMechanism, String clientId) {
-        this(clusterId, bootstrapServers, securityProtocol, saslMechanism, clientId, "none", null, null, null, null);
+        this(clusterId, bootstrapServers, securityProtocol, saslMechanism, clientId, "none", null, null);
     }
 
     public KafkaConnectionEntity(
@@ -62,20 +56,9 @@ public class KafkaConnectionEntity {
             String clientId,
             String registryKind,
             String registryUrl,
-            String registryGlueRegion,
-            String registryGlueRegistry,
             byte[] registrySecret) {
         this.clusterId = clusterId;
-        change(
-                bootstrapServers,
-                securityProtocol,
-                saslMechanism,
-                clientId,
-                registryKind,
-                registryUrl,
-                registryGlueRegion,
-                registryGlueRegistry,
-                registrySecret);
+        change(bootstrapServers, securityProtocol, saslMechanism, clientId, registryKind, registryUrl, registrySecret);
     }
 
     public void change(
@@ -85,8 +68,6 @@ public class KafkaConnectionEntity {
             String clientId,
             String registryKind,
             String registryUrl,
-            String registryGlueRegion,
-            String registryGlueRegistry,
             byte[] registrySecret) {
         this.bootstrapServers = bootstrapServers;
         this.securityProtocol = securityProtocol;
@@ -94,8 +75,6 @@ public class KafkaConnectionEntity {
         this.clientId = clientId;
         this.registryKind = registryKind;
         this.registryUrl = registryUrl;
-        this.registryGlueRegion = registryGlueRegion;
-        this.registryGlueRegistry = registryGlueRegistry;
         this.registrySecret = registrySecret;
     }
 }

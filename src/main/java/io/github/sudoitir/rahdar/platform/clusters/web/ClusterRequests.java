@@ -203,10 +203,8 @@ public final class ClusterRequests {
          * @param credentials a user name and password for PLAIN and SCRAM, a token for OAUTHBEARER
          * @param tlsBundle optional Spring SSL bundle: the trust store and a client certificate
          * @param clientId optional client id the brokers see in their logs
-         * @param registryKind {@code none}, {@code confluent} or {@code glue}; omitted means none
+         * @param registryKind {@code none} or {@code confluent}; omitted means none
          * @param registryUrl a Confluent-compatible registry's base URL
-         * @param registryGlueRegion the region of a Glue registry
-         * @param registryGlueRegistry the registry name of a Glue registry
          * @param registryCredentials the registry credential as {@code user:password}; never returned
          */
         public record KafkaConnection(
@@ -218,12 +216,10 @@ public final class ClusterRequests {
                 String tlsBundle,
                 String clientId,
 
-                @Schema(allowableValues = {"none", "confluent", "glue"})
+                @Schema(allowableValues = {"none", "confluent"})
                 String registryKind,
 
                 String registryUrl,
-                String registryGlueRegion,
-                String registryGlueRegistry,
 
                 @Schema(description = "user:password. Never returned.")
                 String registryCredentials)
@@ -248,8 +244,6 @@ public final class ClusterRequests {
                         clientId,
                         null,
                         null,
-                        null,
-                        null,
                         null);
             }
 
@@ -265,9 +259,7 @@ public final class ClusterRequests {
                 return "KafkaConnection[system=" + system + ", bootstrapServers=" + bootstrapServers
                         + ", securityProtocol=" + securityProtocol + ", saslMechanism=" + saslMechanism
                         + ", credentials=" + credentials + ", tlsBundle=" + tlsBundle + ", clientId=" + clientId
-                        + ", registryKind=" + registryKind + ", registryUrl=" + registryUrl
-                        + ", registryGlueRegion=" + registryGlueRegion + ", registryGlueRegistry="
-                        + registryGlueRegistry + ", registryCredentials="
+                        + ", registryKind=" + registryKind + ", registryUrl=" + registryUrl + ", registryCredentials="
                         + (registryCredentials == null ? "none" : SecretRedactor.MASK) + "]";
             }
         }
@@ -512,13 +504,11 @@ public final class ClusterRequests {
 
                 @Schema(
                         nullable = true,
-                        allowableValues = {"none", "confluent", "glue"},
+                        allowableValues = {"none", "confluent"},
                         description = "Omitted leaves the stored registry. none clears it.")
                 String registryKind,
 
                 @Schema(nullable = true) String registryUrl,
-                @Schema(nullable = true) String registryGlueRegion,
-                @Schema(nullable = true) String registryGlueRegistry,
 
                 @Schema(
                         nullable = true,
@@ -546,8 +536,6 @@ public final class ClusterRequests {
                         clientId,
                         null,
                         null,
-                        null,
-                        null,
                         null);
             }
 
@@ -557,9 +545,7 @@ public final class ClusterRequests {
                 return "KafkaConnectionUpdate[system=" + system + ", bootstrapServers=" + bootstrapServers
                         + ", securityProtocol=" + securityProtocol + ", saslMechanism=" + saslMechanism
                         + ", credentials=" + credentials + ", tlsBundle=" + tlsBundle + ", clientId=" + clientId
-                        + ", registryKind=" + registryKind + ", registryUrl=" + registryUrl
-                        + ", registryGlueRegion=" + registryGlueRegion + ", registryGlueRegistry="
-                        + registryGlueRegistry + ", registryCredentials="
+                        + ", registryKind=" + registryKind + ", registryUrl=" + registryUrl + ", registryCredentials="
                         + (registryCredentials == null || registryCredentials.isBlank() ? "none" : SecretRedactor.MASK)
                         + "]";
             }

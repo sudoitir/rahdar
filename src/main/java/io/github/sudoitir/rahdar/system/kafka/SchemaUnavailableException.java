@@ -13,7 +13,7 @@ public class SchemaUnavailableException extends RuntimeException {
         this.system = system;
     }
 
-    /** {@code confluent}, {@code glue}, or the broker system when it has no registry at all. */
+    /** {@code confluent}, or the broker system when it has no registry at all. */
     public String system() {
         return system;
     }

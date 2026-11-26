@@ -8,6 +8,8 @@ import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.kafka.schema.DecodedRecord;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaType;
+import io.github.sudoitir.openbroker.kafka.schema.Subject;
+import io.github.sudoitir.openbroker.kafka.schema.SubjectVersion;
 import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.openbroker.messaging.MessageHeaders;
@@ -18,7 +20,10 @@ import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessages;
 import io.github.sudoitir.rahdar.platform.broker.SchemaDecoding;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -87,6 +92,19 @@ class KafkaSchemaBrowseTest {
 
         assertThat(browsed.decoded().subject()).isEqualTo("orders-value");
         assertThat(browsed.body()).contains("sku");
+    }
+
+    @Test
+    void aSoftDeletedVersionStaysReadable() {
+        var view = KafkaSchemaViews.subject(new Subject(
+                "orders-value",
+                List.of(new SubjectVersion(3, 1, SchemaType.AVRO, "{\"type\":\"record\"}", true)),
+                Optional.empty(),
+                Optional.of("deleted")));
+
+        assertThat(view.versions()).hasSize(1);
+        assertThat(view.versions().getFirst().deleted()).isTrue();
+        assertThat(view.schemaText()).isEqualTo("{\"type\":\"record\"}");
     }
 
     private static String anyName() {

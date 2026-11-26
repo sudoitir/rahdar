@@ -10,6 +10,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.Dispatch;
+import io.github.sudoitir.openbroker.ErrorInfo;
+import io.github.sudoitir.openbroker.ErrorReasons;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaType;
 import io.github.sudoitir.openbroker.kafka.schema.SubjectVersion;
@@ -21,6 +26,8 @@ import io.github.sudoitir.openbroker.operation.PreconditionEnforcement;
 import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
+import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.ResourceForbiddenException;
 import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
@@ -69,6 +76,19 @@ class KafkaSchemaReviewsTest {
     }
 
     @Test
+    void aNewSubjectDoesNotLookLikeItAlreadyExists() {
+        when(catalog.previewRegister(any(), any(), any()))
+                .thenReturn(preview(
+                        "etag-1", "ok", new AttributeChange("subject", Optional.empty(), Optional.of("orders-value"))));
+
+        SchemaPreview view = reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}");
+
+        assertThat(view.before()).isEmpty();
+        assertThat(view.after()).contains("subject=orders-value");
+        assertThat(view.statement()).isEqualTo(KafkaSchemaReviews.NOTHING_WRITTEN);
+    }
+
+    @Test
     void aPreviewWritesNothing() {
         when(catalog.previewRegister(any(), any(), any()))
                 .thenReturn(preview("etag-1", "The registry judges this schema compatible."));
@@ -111,7 +131,10 @@ class KafkaSchemaReviewsTest {
 
         SchemaPreview view = reviews.previewDelete(CLUSTER, "orders-value", true);
 
+        assertThat(view.note()).contains("soft-deletes the subject and then deletes the schema");
         assertThat(view.note()).contains("cannot be restored");
+        assertThat(view.note()).contains(KafkaSchemaReviews.NOTHING_WRITTEN);
+        assertThat(view.action()).isEqualTo("delete");
         assertThat(view.writesNothing()).isTrue();
         verify(catalog, never()).delete(any(), anyBoolean(), any());
     }
@@ -136,6 +159,24 @@ class KafkaSchemaReviewsTest {
                         new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "then")))
                 .isInstanceOf(StalePreviewException.class);
         verify(catalog, never()).register(any(), any(), any(), any());
+    }
+
+    @Test
+    void aPermanentDeleteThatStopsAfterTheSoftDeleteIsInDoubt() {
+        BrokerException doubt = new BrokerException(
+                Status.ABORTED,
+                ErrorInfo.of(ErrorReasons.UNEXPECTED_SYSTEM),
+                Dispatch.IN_DOUBT,
+                null,
+                "Subject not found");
+
+        RuntimeException translated = KafkaSchemaRegistry.translate("confluent", doubt);
+
+        assertThat(translated).isInstanceOf(ConflictException.class).isNotInstanceOf(NotFoundException.class);
+        assertThat(translated.getMessage())
+                .contains("soft-deleted")
+                .contains("in doubt")
+                .doesNotContain("not found");
     }
 
     private static Preview preview(String etag, String note, AttributeChange... extra) {

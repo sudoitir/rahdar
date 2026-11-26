@@ -5678,10 +5678,8 @@ export interface components {
       tlsBundle?: string;
       clientId?: string;
       /** @enum {string} */
-      registryKind?: 'none' | 'confluent' | 'glue';
+      registryKind?: 'none' | 'confluent';
       registryUrl?: string;
-      registryGlueRegion?: string;
-      registryGlueRegistry?: string;
       /** @description user:password. Never returned. */
       registryCredentials?: string;
     };
@@ -5922,10 +5920,8 @@ export interface components {
       tlsBundle?: string | null;
       clientId?: string | null;
       /** @enum {string} */
-      registryKind: 'none' | 'confluent' | 'glue';
+      registryKind: 'none' | 'confluent';
       registryUrl?: string | null;
-      registryGlueRegion?: string | null;
-      registryGlueRegistry?: string | null;
       /** @description Whether a registry credential is stored. The credential itself is never returned. */
       registrySecretStored: boolean;
     };
@@ -7633,10 +7629,8 @@ export interface components {
        * @description Omitted leaves the stored registry. none clears it.
        * @enum {string|null}
        */
-      registryKind?: 'none' | 'confluent' | 'glue' | null;
+      registryKind?: 'none' | 'confluent' | null;
       registryUrl?: string | null;
-      registryGlueRegion?: string | null;
-      registryGlueRegistry?: string | null;
       /** @description user:password. Empty or omitted keeps the stored credential unless the registry changed. Never returned. */
       registryCredentials?: string | null;
     };

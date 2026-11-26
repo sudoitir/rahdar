@@ -2,12 +2,14 @@ package io.github.sudoitir.rahdar.system.kafka;
 
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.access.Assessment;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.kafka.schema.Subject;
 import io.github.sudoitir.openbroker.kafka.schema.Subjects;
 import io.github.sudoitir.openbroker.messaging.Cursor;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
@@ -87,6 +89,12 @@ public class KafkaSchemaRegistry {
     }
 
     static RuntimeException translate(String system, BrokerException e) {
+        if (e.dispatch() == Dispatch.IN_DOUBT) {
+            return new ConflictException(
+                    "schema-delete-in-doubt",
+                    "The subject was soft-deleted, and the permanent delete did not finish. The state is in doubt.",
+                    e);
+        }
         if (e.status() == Status.UNAVAILABLE || e.status() == Status.UNIMPLEMENTED) {
             return new SchemaUnavailableException(system, e.getMessage());
         }

@@ -42,18 +42,7 @@ class KafkaSchemaCredentialTest {
     @Test
     void aConnectionDoesNotPrintItsRegistryCredential() {
         KafkaConnection connection = new KafkaConnection(
-                "kafka",
-                List.of("k:9092"),
-                "PLAINTEXT",
-                null,
-                null,
-                null,
-                null,
-                "confluent",
-                "https://r",
-                null,
-                null,
-                SECRET);
+                "kafka", List.of("k:9092"), "PLAINTEXT", null, null, null, null, "confluent", "https://r", SECRET);
 
         assertThat(connection.toString()).doesNotContain("registry-secret-value");
         assertThat(connection.registryCredentials()).isEqualTo(SECRET);

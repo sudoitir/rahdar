@@ -39242,15 +39242,9 @@
           },
           "registryKind" : {
             "type" : "string",
-            "enum" : [ "none", "confluent", "glue" ]
+            "enum" : [ "none", "confluent" ]
           },
           "registryUrl" : {
-            "type" : "string"
-          },
-          "registryGlueRegion" : {
-            "type" : "string"
-          },
-          "registryGlueRegistry" : {
             "type" : "string"
           },
           "registryCredentials" : {
@@ -39933,15 +39927,9 @@
           },
           "registryKind" : {
             "type" : "string",
-            "enum" : [ "none", "confluent", "glue" ]
+            "enum" : [ "none", "confluent" ]
           },
           "registryUrl" : {
-            "type" : [ "string", "null" ]
-          },
-          "registryGlueRegion" : {
-            "type" : [ "string", "null" ]
-          },
-          "registryGlueRegistry" : {
             "type" : [ "string", "null" ]
           },
           "registrySecretStored" : {
@@ -44045,15 +44033,9 @@
           "registryKind" : {
             "type" : [ "string", "null" ],
             "description" : "Omitted leaves the stored registry. none clears it.",
-            "enum" : [ "none", "confluent", "glue", null ]
+            "enum" : [ "none", "confluent", null ]
           },
           "registryUrl" : {
-            "type" : [ "string", "null" ]
-          },
-          "registryGlueRegion" : {
-            "type" : [ "string", "null" ]
-          },
-          "registryGlueRegistry" : {
             "type" : [ "string", "null" ]
           },
           "registryCredentials" : {

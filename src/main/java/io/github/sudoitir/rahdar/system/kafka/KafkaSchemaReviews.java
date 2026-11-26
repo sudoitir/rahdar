@@ -32,11 +32,15 @@ import org.springframework.stereotype.Service;
 public class KafkaSchemaReviews {
 
     /** The sentence every preview carries, so the copy cannot drift. */
-    public static final String NOTHING_WRITTEN = "Nothing was written.";
+    public static final String NOTHING_WRITTEN = "Nothing has been written.";
+
+    /** A permanent delete is one action: soft-delete, then delete the schema. */
+    static final String PERMANENT_DELETE =
+            "This soft-deletes the subject and then deletes the schema. The schemas cannot be restored. "
+                    + NOTHING_WRITTEN;
 
     private static final String ALREADY = "Already registered";
     private static final String CHECK_ON_APPLY = "The compatibility check happens on apply.";
-    private static final String CANNOT_RESTORE = "The schemas cannot be restored.";
     private static final String SCHEMA = "SCHEMA";
     private static final String APPLIED = "APPLIED";
 
@@ -123,9 +127,12 @@ public class KafkaSchemaReviews {
     public SchemaPreview previewDelete(UUID clusterId, String subject, boolean permanent) {
         access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview preview = registries.call(clusterId, catalog -> catalog.previewDelete(subject, permanent));
-        SchemaPreview view = of(subject, permanent ? "delete-permanent" : "delete", preview);
-        if (permanent && (view.note() == null || !view.note().contains(CANNOT_RESTORE))) {
-            return withNote(view, CANNOT_RESTORE);
+        SchemaPreview view = of(subject, "delete", preview);
+        if (permanent) {
+            return withNote(view, PERMANENT_DELETE);
+        }
+        if (view.note() == null || !view.note().contains(NOTHING_WRITTEN)) {
+            return withNote(view, NOTHING_WRITTEN);
         }
         return view;
     }
