@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.GroupDeletePar
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts.AbortParams;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Acl;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.springframework.context.annotation.Bean;
@@ -246,10 +247,7 @@ class KafkaGatedOperations {
                 SchemaWriteParams.class,
                 SchemaWriteParams::clusterId,
                 p -> "Change schema " + p.action() + " on " + clusters.labelOf(p.clusterId()),
-                p -> List.of(
-                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Action", p.action()),
-                        DisplayRow.of("Subject", p.subject() == null ? "default" : p.subject())),
+                p -> schemaRows(clusters, p),
                 reviews::estimate,
                 reviews::replay,
                 clusters,
@@ -273,6 +271,28 @@ class KafkaGatedOperations {
                 bindings::replay,
                 clusters,
                 Set.of());
+    }
+
+    static List<DisplayRow> schemaRows(ClusterEnvironmentIndex clusters, SchemaWriteParams p) {
+        List<DisplayRow> rows = new ArrayList<>();
+        rows.add(DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())));
+        rows.add(DisplayRow.of("Action", p.action()));
+        rows.add(DisplayRow.of("Subject", p.subject() == null ? "default" : p.subject()));
+        if (p.level() != null) {
+            rows.add(DisplayRow.of("Compatibility", p.level()));
+        }
+        if (p.permanent() != null) {
+            rows.add(DisplayRow.of(
+                    "Permanent",
+                    Boolean.TRUE.equals(p.permanent())
+                            ? "yes — the schemas cannot be restored"
+                            : "no — hidden from the default list, still readable, not undoable from this screen"));
+        }
+        if (p.schema() != null) {
+            String text = p.schema();
+            rows.add(DisplayRow.of("Schema", text.length() <= 120 ? text : text.substring(0, 117) + "..."));
+        }
+        return rows;
     }
 
     private static String text(Acl a) {

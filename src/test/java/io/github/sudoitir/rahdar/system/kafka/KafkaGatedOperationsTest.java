@@ -13,6 +13,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.CancelParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ElectParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.NamedPartition;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ReassignParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaWriteParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.DeleteParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.GroupDeleteParams;
@@ -86,5 +87,22 @@ class KafkaGatedOperationsTest {
         assertThat(stop.display(cancel)).extracting(DisplayRow::label).contains("Partitions");
         stop.replay(cancel);
         verify(replication).replayCancel(cancel);
+    }
+
+    @Test
+    void anApproverSeesWhetherASchemaDeleteIsPermanent() {
+        List<DisplayRow> permanent = KafkaGatedOperations.schemaRows(
+                clusters, new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, true, "e"));
+        List<DisplayRow> soft = KafkaGatedOperations.schemaRows(
+                clusters, new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, false, "e"));
+        List<DisplayRow> level = KafkaGatedOperations.schemaRows(
+                clusters,
+                new SchemaWriteParams(CLUSTER, "compatibility", "orders-value", null, null, "BACKWARD", null, "e"));
+
+        assertThat(permanent)
+                .extracting(DisplayRow::label, DisplayRow::to)
+                .contains(tuple("Permanent", "yes — the schemas cannot be restored"));
+        assertThat(soft).extracting(DisplayRow::to).anyMatch(value -> value != null && value.startsWith("no"));
+        assertThat(level).extracting(DisplayRow::label, DisplayRow::to).contains(tuple("Compatibility", "BACKWARD"));
     }
 }
