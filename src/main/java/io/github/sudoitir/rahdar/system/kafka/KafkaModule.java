@@ -15,6 +15,10 @@ public final class KafkaModule {
 
     public static final String TRANSACTION_ABORT = "transaction:abort";
 
+    public static final String SCHEMA_READ = "schema:read";
+
+    public static final String SCHEMA_WRITE = "schema:write";
+
     public static final FeatureDescriptor DESCRIPTOR = FeatureDescriptor.builder()
             .id(SYSTEM)
             .title("Kafka")
@@ -24,6 +28,12 @@ public final class KafkaModule {
                     TRANSACTION_READ, "See a Kafka cluster's transactions", Permissions.CLUSTER_READ))
             .permission(PermissionDef.cluster(
                     TRANSACTION_ABORT, "Abort a Kafka cluster's hanging transactions", TRANSACTION_READ))
+            .permission(PermissionDef.cluster(
+                    SCHEMA_READ,
+                    "See a cluster's schema registry, subjects and compatibility",
+                    Permissions.CLUSTER_READ))
+            .permission(PermissionDef.cluster(
+                    SCHEMA_WRITE, "Register schemas, change compatibility and delete subjects", SCHEMA_READ))
             .mcpTools(KafkaMcpToolDefs.ALL)
             .build();
 
