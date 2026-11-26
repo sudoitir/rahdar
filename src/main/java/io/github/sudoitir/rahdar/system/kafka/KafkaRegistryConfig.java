@@ -7,8 +7,10 @@ import java.util.Set;
 /** The schema-registry fields of a Kafka connection, checked and copied onto the driver's options. */
 final class KafkaRegistryConfig {
 
-    static final Set<String> KINDS =
-            Set.of(KafkaOptions.REGISTRY_NONE, KafkaOptions.REGISTRY_CONFLUENT, KafkaOptions.REGISTRY_GLUE);
+    /** Stored, and checked, even though the current driver only connects a Confluent registry. */
+    static final String GLUE = "glue";
+
+    static final Set<String> KINDS = Set.of(KafkaOptions.REGISTRY_NONE, KafkaOptions.REGISTRY_CONFLUENT, GLUE);
 
     private KafkaRegistryConfig() {}
 
@@ -28,14 +30,13 @@ final class KafkaRegistryConfig {
         if (KafkaOptions.REGISTRY_CONFLUENT.equals(resolved) && !isHttp(url)) {
             throw new IllegalArgumentException("registryUrl must be an http or https URL.");
         }
-        if (KafkaOptions.REGISTRY_GLUE.equals(resolved) && (blank(region) == null || blank(registry) == null)) {
+        if (GLUE.equals(resolved) && (blank(region) == null || blank(registry) == null)) {
             throw new IllegalArgumentException(
                     "registryGlueRegion and registryGlueRegistry are required when the registry kind is glue.");
         }
     }
 
-    static void put(
-            Map<String, String> options, String kind, String url, String region, String registry, String credentials) {
+    static void put(Map<String, String> options, String kind, String url, String credentials) {
         String resolved = kind(kind);
         options.put(KafkaOptions.REGISTRY_KIND, resolved);
         if (KafkaOptions.REGISTRY_NONE.equals(resolved)) {
@@ -43,12 +44,6 @@ final class KafkaRegistryConfig {
         }
         if (blank(url) != null) {
             options.put(KafkaOptions.REGISTRY_URL, url);
-        }
-        if (blank(region) != null) {
-            options.put(KafkaOptions.REGISTRY_GLUE_REGION, region);
-        }
-        if (blank(registry) != null) {
-            options.put(KafkaOptions.REGISTRY_GLUE_REGISTRY, registry);
         }
         if (blank(credentials) != null) {
             options.put(KafkaOptions.REGISTRY_CREDENTIALS, credentials);

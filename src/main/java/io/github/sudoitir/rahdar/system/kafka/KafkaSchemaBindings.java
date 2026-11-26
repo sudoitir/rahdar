@@ -57,7 +57,7 @@ public class KafkaSchemaBindings implements SchemaBindingLookup {
     }
 
     public SchemaPreview preview(UUID clusterId, String topic, String side, String serde) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         require(topic, side, serde);
         String current = current(clusterId, topic, side);
         return KafkaSchemaReviews.binding(topic, side, current, serde, etag(topic, side, current), null);

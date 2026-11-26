@@ -67,8 +67,6 @@ class KafkaConnectionOptions implements ConnectionOptions {
                 options,
                 connection.getRegistryKind(),
                 connection.getRegistryUrl(),
-                connection.getRegistryGlueRegion(),
-                connection.getRegistryGlueRegistry(),
                 registrySecrets.open(clusterId, connection.getRegistrySecret()));
         return new ClusterSpec(nodes, bootstrap, options);
     }

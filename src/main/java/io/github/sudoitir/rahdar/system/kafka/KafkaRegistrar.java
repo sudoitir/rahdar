@@ -787,13 +787,7 @@ class KafkaRegistrar implements ClusterRegistrar {
         if (blankToNull(kafka.clientId()) != null) {
             options.put(KafkaOptions.CLIENT_ID, kafka.clientId());
         }
-        KafkaRegistryConfig.put(
-                options,
-                kafka.registryKind(),
-                kafka.registryUrl(),
-                kafka.registryGlueRegion(),
-                kafka.registryGlueRegistry(),
-                kafka.registryCredentials());
+        KafkaRegistryConfig.put(options, kafka.registryKind(), kafka.registryUrl(), kafka.registryCredentials());
         return options;
     }
 

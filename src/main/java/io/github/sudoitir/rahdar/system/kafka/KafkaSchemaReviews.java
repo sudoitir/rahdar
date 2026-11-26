@@ -82,7 +82,7 @@ public class KafkaSchemaReviews {
             String etag) {}
 
     public SchemaPreview previewRegister(UUID clusterId, String subject, SchemaType type, String schema) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview preview = registries.call(clusterId, catalog -> catalog.previewRegister(subject, type, schema));
         return of(subject, "register", preview);
     }
@@ -95,7 +95,7 @@ public class KafkaSchemaReviews {
     }
 
     public SchemaPreview previewCompatibility(UUID clusterId, String subject, CompatibilityLevel level) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview preview = registries.call(clusterId, catalog -> catalog.previewCompatibility(subject, level));
         return of(subject, "compatibility", preview);
     }
@@ -108,7 +108,7 @@ public class KafkaSchemaReviews {
     }
 
     public SchemaPreview previewDefault(UUID clusterId, CompatibilityLevel level) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview preview = registries.call(clusterId, catalog -> catalog.previewCompatibilityDefault(level));
         return of(null, "default-compatibility", preview);
     }
@@ -121,7 +121,7 @@ public class KafkaSchemaReviews {
     }
 
     public SchemaPreview previewDelete(UUID clusterId, String subject, boolean permanent) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
         Preview preview = registries.call(clusterId, catalog -> catalog.previewDelete(subject, permanent));
         SchemaPreview view = of(subject, permanent ? "delete-permanent" : "delete", preview);
         if (permanent && (view.note() == null || !view.note().contains(CANNOT_RESTORE))) {
