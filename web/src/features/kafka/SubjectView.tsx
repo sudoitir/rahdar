@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Group, Select, Stack, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { Link, useParams } from '@tanstack/react-router';
@@ -35,6 +35,14 @@ const SET: ActionVerb = { verb: 'Set', past: 'Set', progressive: 'Setting' };
 const DELETE: ActionVerb = { verb: 'Delete', past: 'Deleted', progressive: 'Deleting' };
 
 type Mode = 'level' | 'delete' | null;
+
+/** A level the registry accepts, or empty. Never a stand-in the operator did not choose. */
+function knownLevel(level: string | null | undefined): string {
+  for (const known of COMPATIBILITY_LEVELS) {
+    if (known === level) return known;
+  }
+  return '';
+}
 
 function versionWords(versions: { version: number; deleted: boolean }[] | undefined): string {
   if (!versions || versions.length === 0) return 'None';
@@ -75,6 +83,7 @@ export function SubjectView() {
   const previewDelete = usePreviewDelete(clusterId, subject);
   const remove = useDeleteSubject(clusterId, subject);
   const [mode, setMode] = useState<Mode>(null);
+  const started = useRef<Mode>(null);
   const [permanent, setPermanent] = useState(false);
   const [shown, setShown] = useState<SchemaPreview | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
@@ -85,12 +94,13 @@ export function SubjectView() {
   const name = data?.name ?? subject;
 
   const form = useForm({
-    initialValues: { level: data?.compatibility ?? 'BACKWARD' },
+    initialValues: { level: '' },
     validateInputOnBlur: true,
     validate: { level: (value) => (value ? null : 'Choose a compatibility level.') },
   });
 
   const close = () => {
+    started.current = null;
     setMode(null);
     setShown(null);
     setApplied(null);
@@ -101,15 +111,42 @@ export function SubjectView() {
   };
 
   const fetchLevel = form.onSubmit((values) => {
+    started.current = 'level';
+    setShown(null);
+    previewDelete.reset();
+    remove.reset();
     setLevel.reset();
-    previewLevel.mutate({ level: values.level }, { onSuccess: setShown });
+    previewLevel.mutate(
+      { level: values.level },
+      {
+        onSuccess: (preview) => {
+          if (started.current === 'level') setShown(preview);
+        },
+      },
+    );
   }, focusFirstInvalid(form.getInputNode));
 
   const fetchDelete = (next: boolean) => {
+    started.current = 'delete';
+    setShown(null);
     setPermanent(next);
     setMode('delete');
+    previewLevel.reset();
+    setLevel.reset();
     remove.reset();
-    previewDelete.mutate({ permanent: next }, { onSuccess: setShown });
+    previewDelete.mutate(
+      { permanent: next },
+      {
+        onSuccess: (preview) => {
+          if (started.current === 'delete') setShown(preview);
+        },
+      },
+    );
+  };
+
+  const openLevel = () => {
+    form.setFieldValue('level', knownLevel(data?.compatibility));
+    setMode('level');
   };
 
   const applyError = mode === 'delete' ? remove.error : setLevel.error;
@@ -192,7 +229,12 @@ export function SubjectView() {
           </section>
           <Group>
             <CapabilityGate verdict={gate} what="setting compatibility">
-              <Button size="xs" variant="default" disabled={gate.kind === 'blocked'} onClick={() => setMode('level')}>
+              <Button
+                size="xs"
+                variant="default"
+                disabled={gate.kind === 'blocked' || previewDelete.isPending}
+                onClick={openLevel}
+              >
                 Set compatibility
               </Button>
             </CapabilityGate>
@@ -200,7 +242,7 @@ export function SubjectView() {
               <Button
                 size="xs"
                 variant="default"
-                disabled={gate.kind === 'blocked'}
+                disabled={gate.kind === 'blocked' || previewLevel.isPending || (previewDelete.isPending && permanent)}
                 loading={previewDelete.isPending && !permanent}
                 onClick={() => fetchDelete(false)}
               >
@@ -211,7 +253,7 @@ export function SubjectView() {
               <Button
                 size="xs"
                 color="signal"
-                disabled={gate.kind === 'blocked'}
+                disabled={gate.kind === 'blocked' || previewLevel.isPending || (previewDelete.isPending && !permanent)}
                 loading={previewDelete.isPending && permanent}
                 onClick={() => fetchDelete(true)}
               >

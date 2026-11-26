@@ -34,6 +34,9 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
   const { can, loading } = useCan();
   const [shown, setShown] = useState<SchemaPreview | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
+  // `applied` stays, so Current survives a second review. `outcome` is only this attempt, or the next
+  // review opens already finished and the hold is gone.
+  const [outcome, setOutcome] = useState<string | null>(null);
 
   const unavailable = registryReason(cluster.data?.capabilities.findings, preview.error);
   const gate = schemaWriteGate(can('schema:write', clusterId), loading, unavailable);
@@ -46,11 +49,13 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
 
   const close = () => {
     setShown(null);
+    setOutcome(null);
     preview.reset();
     apply.reset();
   };
 
   const fetchPreview = form.onSubmit((values) => {
+    setOutcome(null);
     apply.reset();
     preview.mutate({ level: values.level }, { onSuccess: setShown });
   }, focusFirstInvalid(form.getInputNode));
@@ -62,6 +67,7 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
       {
         onSuccess: (level) => {
           setApplied(level);
+          setOutcome(level);
           notify.succeeded({ action: SET, subject: 'the registry default compatibility' });
         },
         onError: (error) => {
@@ -123,7 +129,7 @@ export function RegistryDefault({ clusterId }: Readonly<{ clusterId: string }>) 
         error={apply.isError && !stale ? apply.error : undefined}
         onConfirm={run}
         onRefresh={() => fetchPreview()}
-        result={applied ? <Text size="sm">Registry default is {applied}.</Text> : undefined}
+        result={outcome ? <Text size="sm">Registry default is {outcome}.</Text> : undefined}
       />
     </Section>
   );

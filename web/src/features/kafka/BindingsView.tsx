@@ -159,27 +159,27 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
         </FieldRow>
       </form>
       {preview.isError ? <ErrorState variant="inline" error={preview.error} /> : null}
-      <DataTable
-        label="Schema bindings"
-        storageKey="kafka.schema-bindings"
-        variant="static"
-        columns={bindingColumns()}
-        data={rows}
-        rowKey={(row) => `${row.topic ?? ''}:${row.side ?? ''}`}
-        loading={bindings.isPending}
-        error={
-          bindings.isError && !unavailable ? (
-            <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} />
-          ) : undefined
-        }
-        empty={
-          <EmptyState
-            kind="empty"
-            title="No bindings"
-            description="A binding overrides the serde for one topic's key or value. Decode reads the schema id and uses the schema's type; a binding only overrides that serde."
-          />
-        }
-      />
+      {unavailable ? null : (
+        <DataTable
+          label="Schema bindings"
+          storageKey="kafka.schema-bindings"
+          variant="static"
+          columns={bindingColumns()}
+          data={rows}
+          rowKey={(row) => `${row.topic ?? ''}:${row.side ?? ''}`}
+          loading={bindings.isPending}
+          error={
+            bindings.isError ? <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} /> : undefined
+          }
+          empty={
+            <EmptyState
+              kind="empty"
+              title="No bindings"
+              description="A binding overrides the serde for one topic's key or value. Decode reads the schema id and uses the schema's type; a binding only overrides that serde."
+            />
+          }
+        />
+      )}
       <SchemaReview
         opened={shown !== null}
         onClose={close}

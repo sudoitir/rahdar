@@ -96,6 +96,7 @@ describe('schema subjects', () => {
     renderAppAt('/clusters/k1/kafka/schemas?q=missing');
 
     expect(await screen.findByText('No subject matches this filter')).toBeInTheDocument();
+    expect(screen.getByText('Clear it to see every subject.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(await screen.findByRole('link', { name: 'orders-value' })).toBeInTheDocument();
   });
@@ -171,5 +172,13 @@ describe('schema subjects', () => {
 
     await waitFor(() => expect(calls.map((call) => call.path)).toEqual(['preview', 'apply']));
     expect(calls[1].body).toMatchObject({ level: 'FULL', etag: 'd1' });
+    expect(await within(dialog).findByText('Registry default is FULL.')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Review registry default' }));
+    const again = await screen.findByRole('dialog', { name: 'Set registry default compatibility' });
+    expect(within(again).getByRole('button', { name: 'Set registry default compatibility' })).toBeEnabled();
+    expect(within(again).queryByText('Registry default is FULL.')).not.toBeInTheDocument();
   });
 });

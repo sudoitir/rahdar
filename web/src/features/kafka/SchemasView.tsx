@@ -126,7 +126,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
               <EmptyState
                 kind="filtered"
                 title="No subject matches this filter"
-                description="Subjects may still exist; none of this page matches the filter."
+                description="Clear it to see every subject."
                 onClearFilters={() => {
                   setDraft('');
                   writeQ.cancel();

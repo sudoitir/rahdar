@@ -51,6 +51,7 @@ describe('schema bindings', () => {
     expect(await screen.findByText('The schema registry is unavailable')).toBeInTheDocument();
     expect(screen.getByText('confluent has no bindings endpoint.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(screen.queryByText('No bindings')).not.toBeInTheDocument();
   });
 
   it('lists a topic side and its serde', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { holdButton } from '../../test/hold.ts';
@@ -103,6 +103,50 @@ describe('a schema subject', () => {
     await user.click(await screen.findByRole('button', { name: 'Permanently delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Permanently delete subject orders-value' });
     expect(dialog).toHaveTextContent('The schemas cannot be restored.');
+  });
+});
+
+describe('a subject compatibility change', () => {
+  it('does not offer BACKWARD when the subject has no level of its own', async () => {
+    mockKafkaCluster();
+    server.use(
+      http.get('*/api/v1/clusters/k1/kafka/schemas/orders-value', () =>
+        HttpResponse.json({ ...SUBJECT, compatibility: null, compatibilityNote: 'Registry default' }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas/orders-value');
+
+    expect(await screen.findByText('Registry default')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Set compatibility' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Set compatibility of orders-value' });
+    expect(within(dialog).getByRole('combobox', { name: 'Compatibility' })).not.toHaveTextContent('BACKWARD');
+    await user.click(within(dialog).getByRole('button', { name: 'Preview compatibility' }));
+    expect(await within(dialog).findByText('Choose a compatibility level.')).toBeInTheDocument();
+  });
+
+  it('does not let a slow delete preview open the level review', async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    serve();
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas/orders-value\\:delete-preview', async () => {
+        await held;
+        return HttpResponse.json(PREVIEW);
+      }),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas/orders-value');
+
+    await user.click(await screen.findByRole('button', { name: 'Delete subject' }));
+    expect(screen.getByRole('button', { name: 'Set compatibility' })).toBeDisabled();
+    expect(screen.queryByRole('dialog', { name: 'Set compatibility of orders-value' })).not.toBeInTheDocument();
+
+    release();
+    expect(await screen.findByRole('dialog', { name: 'Delete subject orders-value' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Set compatibility of orders-value' })).not.toBeInTheDocument();
   });
 });
 
