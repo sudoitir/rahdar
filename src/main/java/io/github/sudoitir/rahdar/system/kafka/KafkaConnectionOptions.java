@@ -39,6 +39,7 @@ class KafkaConnectionOptions implements ConnectionOptions {
 
     private final KafkaConnectionRepository connections;
     private final ConnectionSettingsSource settings;
+    private final KafkaRegistrySecrets registrySecrets;
 
     @Override
     public String system() {
@@ -62,6 +63,13 @@ class KafkaConnectionOptions implements ConnectionOptions {
         options.put(KafkaOptions.SECURITY_PROTOCOL, connection.getSecurityProtocol());
         Optional.ofNullable(connection.getSaslMechanism()).ifPresent(m -> options.put(KafkaOptions.SASL_MECHANISM, m));
         Optional.ofNullable(connection.getClientId()).ifPresent(c -> options.put(KafkaOptions.CLIENT_ID, c));
+        KafkaRegistryConfig.put(
+                options,
+                connection.getRegistryKind(),
+                connection.getRegistryUrl(),
+                connection.getRegistryGlueRegion(),
+                connection.getRegistryGlueRegistry(),
+                registrySecrets.open(clusterId, connection.getRegistrySecret()));
         return new ClusterSpec(nodes, bootstrap, options);
     }
 

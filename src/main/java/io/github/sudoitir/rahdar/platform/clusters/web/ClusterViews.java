@@ -351,7 +351,21 @@ public interface ClusterViews {
             boolean secretStored,
 
             @Schema(nullable = true) String tlsBundle,
-            @Schema(nullable = true) String clientId)
+            @Schema(nullable = true) String clientId,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    allowableValues = {"none", "confluent", "glue"})
+            String registryKind,
+
+            @Schema(nullable = true) String registryUrl,
+            @Schema(nullable = true) String registryGlueRegion,
+            @Schema(nullable = true) String registryGlueRegistry,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Whether a registry credential is stored. The credential itself is never returned.")
+            boolean registrySecretStored)
             implements SystemConnectionDetail {}
 
     /** One broker endpoint — a {@code broker_node} row, minus anything secret. */

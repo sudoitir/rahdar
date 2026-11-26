@@ -33,16 +33,69 @@ public class KafkaConnectionEntity {
     @Column(name = "client_id")
     private String clientId;
 
+    @Column(name = "registry_kind", nullable = false)
+    private String registryKind;
+
+    @Column(name = "registry_url")
+    private String registryUrl;
+
+    @Column(name = "registry_glue_region")
+    private String registryGlueRegion;
+
+    @Column(name = "registry_glue_registry")
+    private String registryGlueRegistry;
+
+    /** The vault envelope. Never copied onto a DTO, an audit map or a log. */
+    @Column(name = "registry_secret")
+    private byte[] registrySecret;
+
     public KafkaConnectionEntity(
             UUID clusterId, String bootstrapServers, String securityProtocol, String saslMechanism, String clientId) {
-        this.clusterId = clusterId;
-        change(bootstrapServers, securityProtocol, saslMechanism, clientId);
+        this(clusterId, bootstrapServers, securityProtocol, saslMechanism, clientId, "none", null, null, null, null);
     }
 
-    public void change(String bootstrapServers, String securityProtocol, String saslMechanism, String clientId) {
+    public KafkaConnectionEntity(
+            UUID clusterId,
+            String bootstrapServers,
+            String securityProtocol,
+            String saslMechanism,
+            String clientId,
+            String registryKind,
+            String registryUrl,
+            String registryGlueRegion,
+            String registryGlueRegistry,
+            byte[] registrySecret) {
+        this.clusterId = clusterId;
+        change(
+                bootstrapServers,
+                securityProtocol,
+                saslMechanism,
+                clientId,
+                registryKind,
+                registryUrl,
+                registryGlueRegion,
+                registryGlueRegistry,
+                registrySecret);
+    }
+
+    public void change(
+            String bootstrapServers,
+            String securityProtocol,
+            String saslMechanism,
+            String clientId,
+            String registryKind,
+            String registryUrl,
+            String registryGlueRegion,
+            String registryGlueRegistry,
+            byte[] registrySecret) {
         this.bootstrapServers = bootstrapServers;
         this.securityProtocol = securityProtocol;
         this.saslMechanism = saslMechanism;
         this.clientId = clientId;
+        this.registryKind = registryKind;
+        this.registryUrl = registryUrl;
+        this.registryGlueRegion = registryGlueRegion;
+        this.registryGlueRegistry = registryGlueRegistry;
+        this.registrySecret = registrySecret;
     }
 }

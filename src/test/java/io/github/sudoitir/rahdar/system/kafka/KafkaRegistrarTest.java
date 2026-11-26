@@ -57,9 +57,10 @@ class KafkaRegistrarTest {
     private final BrokerGateway gateway = mock(BrokerGateway.class);
     private final KafkaConnectionRepository connections = mock(KafkaConnectionRepository.class);
     private final ConnectionSettingsSource settings = mock(ConnectionSettingsSource.class);
+    private final KafkaRegistrySecrets registrySecrets = mock(KafkaRegistrySecrets.class);
     private boolean accepts;
     private final KafkaRegistrar registrar =
-            new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, host -> accepts);
+            new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, host -> accepts, registrySecrets);
 
     private static KafkaConnection plaintext(String... servers) {
         return new KafkaConnection(
@@ -492,20 +493,26 @@ class KafkaRegistrarTest {
         AtomicInteger inFlight = new AtomicInteger();
         AtomicInteger maxInFlight = new AtomicInteger();
         CountDownLatch overlapping = new CountDownLatch(3);
-        KafkaRegistrar slow = new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, _ -> {
-            probed.incrementAndGet();
-            maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
-            overlapping.countDown();
-            try {
-                // Released once every probe has entered, so a serial probe cannot finish the others.
-                overlapping.await(2, TimeUnit.SECONDS);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-            } finally {
-                inFlight.decrementAndGet();
-            }
-            return false;
-        });
+        KafkaRegistrar slow = new KafkaRegistrar(
+                gateway,
+                BrokerDrivers.load(),
+                connections,
+                settings,
+                _ -> {
+                    probed.incrementAndGet();
+                    maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+                    overlapping.countDown();
+                    try {
+                        // Released once every probe has entered, so a serial probe cannot finish the others.
+                        overlapping.await(2, TimeUnit.SECONDS);
+                    } catch (InterruptedException _) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        inFlight.decrementAndGet();
+                    }
+                    return false;
+                },
+                registrySecrets);
         String[] servers =
                 IntStream.rangeClosed(1, 10).mapToObj(n -> "k" + n + ":9092").toArray(String[]::new);
 
