@@ -29643,6 +29643,93 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/kafka/cluster" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "cluster",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ClusterView"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/kafka/brokers" : {
       "get" : {
         "tags" : [ "kafka-controller" ],
@@ -49036,6 +49123,233 @@
         },
         "required" : [ "available", "majority", "voters" ]
       },
+      "ClusterBroker" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "rack" : {
+            "type" : [ "string", "null" ]
+          },
+          "address" : {
+            "type" : [ "string", "null" ]
+          },
+          "reachable" : {
+            "type" : "boolean",
+            "description" : "False when Rahdar did not reach it, or the cluster says it is not serving."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "leaders" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "replicasHeld" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "outOfSyncReplicas" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "offlineReplicas" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Partitions it replicates that have no leader."
+          },
+          "quorumLeader" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "id", "leaders", "offlineReplicas", "outOfSyncReplicas", "quorumLeader", "reachable", "replicasHeld" ]
+      },
+      "ClusterController" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records behind the quorum leader."
+          },
+          "caughtUp" : {
+            "type" : "boolean"
+          },
+          "quorumLeader" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "caughtUp", "id", "quorumLeader" ]
+      },
+      "ClusterProblems" : {
+        "type" : "object",
+        "properties" : {
+          "offline" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "underReplicated" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "preferredLeaderMismatches" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "topics" : {
+            "type" : "array",
+            "description" : "At most 20 topic names. Empty when the caller lacks destination:read.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "topicsWithheld" : {
+            "type" : [ "string", "null" ],
+            "description" : "Set when the topic names need destination:read."
+          }
+        },
+        "required" : [ "offline", "preferredLeaderMismatches", "topics", "underReplicated" ]
+      },
+      "ClusterTotals" : {
+        "type" : "object",
+        "properties" : {
+          "brokers" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "brokersReached" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "controllers" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "topics" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the read is a floor or placement was not read. Never an invented total."
+          },
+          "partitions" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the read is a floor or placement was not read. Never an invented total."
+          },
+          "underReplicated" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "offline" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "preferredLeaderMismatches" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "atLeast" : {
+            "type" : "boolean",
+            "description" : "True when topics and partitions are a floor, not a total."
+          }
+        },
+        "required" : [ "atLeast", "brokers", "brokersReached", "controllers", "offline", "preferredLeaderMismatches", "underReplicated" ]
+      },
+      "ClusterView" : {
+        "type" : "object",
+        "properties" : {
+          "mode" : {
+            "type" : "string",
+            "description" : "KRaft, ZooKeeper or Unknown."
+          },
+          "complete" : {
+            "type" : "boolean",
+            "description" : "False when the read stopped at the topic cap, or placement was not read."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the read is incomplete."
+          },
+          "brokers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClusterBroker"
+            }
+          },
+          "controllers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClusterController"
+            }
+          },
+          "quorum" : {
+            "$ref" : "#/components/schemas/BrokerQuorum"
+          },
+          "edges" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CoReplication"
+            }
+          },
+          "totals" : {
+            "$ref" : "#/components/schemas/ClusterTotals"
+          },
+          "problems" : {
+            "$ref" : "#/components/schemas/ClusterProblems"
+          },
+          "notes" : {
+            "type" : "array",
+            "description" : "What the cluster cannot show, in words. Never counted as healthy.",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "brokers", "complete", "controllers", "edges", "mode", "notes", "problems", "quorum", "totals" ]
+      },
+      "CoReplication" : {
+        "type" : "object",
+        "properties" : {
+          "a" : {
+            "type" : "string",
+            "description" : "The lower broker id."
+          },
+          "b" : {
+            "type" : "string",
+            "description" : "The higher broker id."
+          },
+          "sharedPartitions" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "outOfSyncReplicas" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Shared partitions where a replica of this pair is out of sync."
+          }
+        },
+        "required" : [ "a", "b", "outOfSyncReplicas", "sharedPartitions" ]
+      },
+      "QuorumVoter" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records behind the quorum leader."
+          },
+          "caughtUp" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "caughtUp", "id" ]
+      },
       "BrokerRow" : {
         "type" : "object",
         "properties" : {
@@ -49090,23 +49404,6 @@
           }
         },
         "required" : [ "brokers", "mode", "quorum" ]
-      },
-      "QuorumVoter" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string"
-          },
-          "lag" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int64",
-            "description" : "Records behind the quorum leader."
-          },
-          "caughtUp" : {
-            "type" : "boolean"
-          }
-        },
-        "required" : [ "caughtUp", "id" ]
       },
       "BrokerConfig" : {
         "type" : "object",
