@@ -55,7 +55,7 @@ vi.mock('./api.ts', () => ({
     error: null,
     reset: () => undefined,
   }),
-  useKafkaBrokers: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useKafkaCluster: () => ({ data: undefined, isPending: false, isError: false, error: null }),
 }));
 
 function renderForm(scheme: 'light' | 'dark', permissionReason: string | null = null) {

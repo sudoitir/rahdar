@@ -410,24 +410,7 @@ public final class KafkaViews {
             @Schema(requiredMode = REQUIRED, description = "False where it had ended already.")
             boolean aborted) {}
 
-    // ---- brokers ------------------------------------------------------------------------------------------------
-
-    public record BrokerRow(
-            @Schema(requiredMode = REQUIRED) String id,
-            @Schema(nullable = true) String rack,
-            @Schema(nullable = true) String address,
-
-            @Schema(requiredMode = REQUIRED, description = "Whether Rahdar reaches it on the address it advertises.")
-            boolean reachable,
-
-            @Schema(nullable = true, description = "Why it is not reachable or not serving.")
-            String reason,
-
-            @Schema(requiredMode = REQUIRED) long leaders,
-            @Schema(requiredMode = REQUIRED) long underReplicated,
-
-            @Schema(requiredMode = REQUIRED, description = "Partitions it replicates that have no leader.")
-            long offline) {}
+    // ---- quorum -------------------------------------------------------------------------------------------------
 
     public record QuorumVoter(
             @Schema(requiredMode = REQUIRED) String id,
@@ -447,13 +430,6 @@ public final class KafkaViews {
 
             @Schema(requiredMode = REQUIRED, description = "Whether the voters that are caught up are a majority.")
             boolean majority) {}
-
-    public record Brokers(
-            @Schema(requiredMode = REQUIRED, description = "KRaft or ZooKeeper.")
-            String mode,
-
-            @Schema(requiredMode = REQUIRED) List<BrokerRow> brokers,
-            @Schema(requiredMode = REQUIRED) BrokerQuorum quorum) {}
 
     // ---- cluster ------------------------------------------------------------------------------------------------
 

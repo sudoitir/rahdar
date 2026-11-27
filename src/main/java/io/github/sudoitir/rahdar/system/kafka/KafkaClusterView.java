@@ -73,6 +73,9 @@ public class KafkaClusterView {
     static final String FENCE_GAP =
             "Kafka before 4.0 does not list fenced brokers, so a fenced broker is missing from the nodes instead of shown as fenced.";
 
+    /** The words a ZooKeeper-mode cluster gets: the controller is not a quorum this view can read. */
+    static final String ZOOKEEPER_QUORUM = "The controller is kept in ZooKeeper and cannot be read.";
+
     /** Leader, replicas and the in-sync set. Offsets and log dirs would wait on a broker that is down. */
     private static final Set<String> PLACEMENT =
             Set.of(KafkaKinds.LEADER, KafkaKinds.REPLICAS, KafkaKinds.IN_SYNC_REPLICAS);
@@ -133,14 +136,28 @@ public class KafkaClusterView {
 
     private static BrokerQuorum quorum(String mode, List<QuorumVoter> voters, String leader, List<String> notes) {
         if ("ZooKeeper".equals(mode)) {
-            notes.add(KafkaBrokers.ZOOKEEPER_QUORUM);
-            return KafkaBrokers.quorum(false, List.of(), null);
+            notes.add(ZOOKEEPER_QUORUM);
+            return quorum(false, List.of(), null);
         }
         if ("Unknown".equals(mode)) {
             notes.add(UNKNOWN_QUORUM);
             return new BrokerQuorum(false, UNKNOWN_QUORUM, null, List.copyOf(voters), false);
         }
-        return KafkaBrokers.quorum(true, voters, leader);
+        return quorum(true, voters, leader);
+    }
+
+    /** Voters that are caught up are a majority only when a leader was elected and they outnumber the rest. */
+    static BrokerQuorum quorum(boolean kraft, List<QuorumVoter> voters, String leader) {
+        if (voters.isEmpty()) {
+            return new BrokerQuorum(
+                    false,
+                    kraft ? "The cluster did not report its controller quorum." : ZOOKEEPER_QUORUM,
+                    null,
+                    List.of(),
+                    false);
+        }
+        long caughtUp = voters.stream().filter(QuorumVoter::caughtUp).count();
+        return new BrokerQuorum(true, null, leader, voters, leader != null && caughtUp * 2 > voters.size());
     }
 
     /** A KRaft cluster whose reported release is before 4.0. An unreadable version stays unstated. */

@@ -153,9 +153,9 @@ class KafkaClusterViewTest {
 
         assertThat(cluster.mode()).isEqualTo("ZooKeeper");
         assertThat(cluster.quorum().available()).isFalse();
-        assertThat(cluster.quorum().reason()).isEqualTo(KafkaBrokers.ZOOKEEPER_QUORUM);
+        assertThat(cluster.quorum().reason()).isEqualTo(KafkaClusterView.ZOOKEEPER_QUORUM);
         assertThat(cluster.quorum().majority()).isFalse();
-        assertThat(cluster.notes()).contains(KafkaBrokers.ZOOKEEPER_QUORUM);
+        assertThat(cluster.notes()).contains(KafkaClusterView.ZOOKEEPER_QUORUM);
     }
 
     @Test

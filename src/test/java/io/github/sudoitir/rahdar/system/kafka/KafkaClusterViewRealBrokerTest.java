@@ -156,7 +156,7 @@ class KafkaClusterViewRealBrokerTest extends PostgresIntegrationTest {
                 ClusterView view = clusterView.read(cluster);
                 assertThat(view.mode()).isEqualTo("ZooKeeper");
                 assertThat(view.quorum().available()).isFalse();
-                assertThat(view.quorum().reason()).isEqualTo(KafkaBrokers.ZOOKEEPER_QUORUM);
+                assertThat(view.quorum().reason()).isEqualTo(KafkaClusterView.ZOOKEEPER_QUORUM);
             } finally {
                 repository.deleteById(cluster);
             }

@@ -1,10 +1,10 @@
 import {
-  IconBuildingBroadcastTower,
   IconLock,
   IconSchema,
   IconStack2,
   IconUsersGroup,
   IconArrowsTransferUp,
+  IconTopologyStar3,
 } from '@tabler/icons-react';
 import { createRoute } from '@tanstack/react-router';
 
@@ -14,7 +14,13 @@ import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { CreateTopicForm } from './CreateTopicForm.tsx';
 import { TopicConfiguration, TopicPartitions } from './rowActions.tsx';
 import { DeleteTopic, IncreasePartitions } from './TopicLifecycleActions.tsx';
-import { validateAclSearch, validateGroupsSearch, validateReplicationSearch, validateSchemasSearch } from './search.ts';
+import {
+  validateAclSearch,
+  validateClusterSearch,
+  validateGroupsSearch,
+  validateReplicationSearch,
+  validateSchemasSearch,
+} from './search.ts';
 
 const view = <K extends string>(load: () => Promise<Record<K, () => React.ReactNode>>, name: K) =>
   lazyFeatureView('kafka', load, name, 'kafka');
@@ -70,10 +76,11 @@ const transactionsRoute = createRoute({
   component: view(() => import('./TransactionsView.tsx'), 'TransactionsView'),
 });
 
-const brokersRoute = createRoute({
+const clusterPageRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'kafka/brokers',
-  component: view(() => import('./BrokersView.tsx'), 'BrokersView'),
+  path: 'kafka/cluster',
+  component: view(() => import('./ClusterView.tsx'), 'ClusterView'),
+  validateSearch: validateClusterSearch,
 });
 
 const schemasRoute = createRoute({
@@ -91,7 +98,7 @@ const schemaSubjectRoute = createRoute({
 
 /**
  * Apache Kafka (ADR-0216): consumer groups with their offsets and the reset of them, topic and broker configuration,
- * ACLs, transactions, brokers, partition placement and replication. Every view is for a Kafka cluster;
+ * ACLs, transactions, the cluster view, partition placement and replication. Every view is for a Kafka cluster;
  * another system's cluster answers its addresses with the not-found page.
  */
 export const kafkaFeature = defineFeature({
@@ -105,7 +112,7 @@ export const kafkaFeature = defineFeature({
       partitionsRoute,
       aclsRoute,
       transactionsRoute,
-      brokersRoute,
+      clusterPageRoute,
       brokerConfigRoute,
       replicationRoute,
       schemasRoute,
@@ -134,9 +141,9 @@ export const kafkaFeature = defineFeature({
     {
       group: 'observe',
       order: 10,
-      label: 'Brokers',
-      icon: IconBuildingBroadcastTower,
-      path: 'kafka/brokers',
+      label: 'Cluster',
+      icon: IconTopologyStar3,
+      path: 'kafka/cluster',
       system: 'kafka',
       permission: 'cluster:read',
     },

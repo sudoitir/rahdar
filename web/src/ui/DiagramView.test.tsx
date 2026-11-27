@@ -114,6 +114,20 @@ describe('DiagramView', () => {
     expect(layoutSignature(nodes, edges.slice(1), 'DOWN')).not.toBe(layoutSignature(nodes, edges, 'DOWN'));
   });
 
+  it('draws a weight as line thickness and does not let it move the layout', async () => {
+    const weighted = edges.map((e) => (e.id === 'a-u' ? { ...e, weight: 12 } : e));
+    expect(layoutSignature(nodes, weighted, 'DOWN')).toBe(layoutSignature(nodes, edges, 'DOWN'));
+    const { container } = render(
+      <MantineProvider>
+        <DiagramView nodes={nodes} edges={weighted} aria-label="Flow orders" />
+      </MantineProvider>,
+    );
+    await screen.findByRole('button', { name: /^Queue, orders/ });
+    const thick = container.querySelector<SVGElement>('[style*="--edge-weight"]');
+    expect(thick).not.toBeNull();
+    expect(thick?.style.getPropertyValue('--edge-weight')).toBe('12');
+  });
+
   it('shows no editing controls unless the caller offers them', async () => {
     draw();
     await screen.findByRole('button', { name: /^Queue, orders/ });

@@ -11,7 +11,7 @@ import { notify, type ActionVerb } from '../../ui/notify.ts';
 import {
   TOPIC_SETTINGS,
   useCreateTopic,
-  useKafkaBrokers,
+  useKafkaCluster,
   usePreviewCreateTopic,
   type TopicCreateBody,
   type TopicPreview,
@@ -109,8 +109,8 @@ export function CreateTopicForm({
   brokersReached?: number | null;
   permissionReason?: string | null;
 }>) {
-  const listed = useKafkaBrokers(clusterId, opened && brokersReached == null);
-  const reached = brokersReached ?? listed.data?.brokers.length ?? null;
+  const listed = useKafkaCluster(clusterId, opened && brokersReached == null);
+  const reached = brokersReached ?? listed.data?.totals.brokersReached ?? null;
   const reachedRef = useRef(reached);
   reachedRef.current = reached;
   const preview = usePreviewCreateTopic(clusterId);

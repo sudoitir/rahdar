@@ -15,7 +15,7 @@ import { axeViolations, contentWidth, Frame, SCHEMES, settle, Themed, type Schem
 import { AclsView } from './AclsView.tsx';
 import { keys, type Acl, type GroupDetail, type GroupSummary, type TopicConfig, type Transaction } from './api.ts';
 import { schemaKeys, type SchemaSubject } from './schemasApi.ts';
-import { BrokersView } from './BrokersView.tsx';
+import { ClusterView } from './ClusterView.tsx';
 import { GroupsView } from './GroupsView.tsx';
 import { GroupView } from './GroupView.tsx';
 import { TopicConfigView } from './TopicConfigView.tsx';
@@ -215,26 +215,62 @@ const CASES: Case[] = [
     seed: (c) => c.setQueryData(keys.transactions('k1'), { items: TRANSACTIONS }),
   },
   {
-    name: 'brokers on ZooKeeper',
-    route: '/clusters/$clusterId/kafka/brokers',
-    path: '/clusters/k1/kafka/brokers',
-    element: <BrokersView />,
+    name: 'cluster on ZooKeeper',
+    route: '/clusters/$clusterId/kafka/cluster',
+    path: '/clusters/k1/kafka/cluster',
+    element: <ClusterView />,
     seed: (c) =>
-      c.setQueryData(keys.brokers('k1'), {
+      c.setQueryData(keys.cluster('k1'), {
+        mode: 'ZooKeeper',
+        complete: true,
+        reason: null,
         brokers: [
-          { id: '1', rack: 'a', address: 'k1:9092', reachable: true, leaders: 10, underReplicated: 0, offline: 0 },
+          {
+            id: '1',
+            rack: 'a',
+            address: 'k1:9092',
+            reachable: true,
+            leaders: 10,
+            replicasHeld: 10,
+            outOfSyncReplicas: 0,
+            offlineReplicas: 0,
+            quorumLeader: false,
+          },
           {
             id: '2',
             address: 'k2:9092',
             reachable: false,
             reason: 'Connection timed out.',
             leaders: 0,
-            underReplicated: 4,
-            offline: 1,
+            replicasHeld: 4,
+            outOfSyncReplicas: 4,
+            offlineReplicas: 1,
+            quorumLeader: false,
           },
         ],
-        mode: 'ZooKeeper',
+        controllers: [],
         quorum: { available: false, reason: 'The cluster runs ZooKeeper.', voters: [], majority: false },
+        edges: [],
+        totals: {
+          brokers: 2,
+          brokersReached: 1,
+          controllers: 0,
+          topics: 1,
+          partitions: 2,
+          underReplicated: 0,
+          offline: 0,
+          preferredLeaderMismatches: 0,
+          atLeast: false,
+        },
+        problems: {
+          offline: 0,
+          underReplicated: 0,
+          preferredLeaderMismatches: 0,
+          topics: [],
+          topicsWithheld: null,
+          topicsOmitted: 0,
+        },
+        notes: ['The cluster runs ZooKeeper.'],
       }),
   },
 ];

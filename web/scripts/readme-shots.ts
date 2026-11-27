@@ -60,7 +60,7 @@ const SETS: Record<string, Shot[]> = {
     { id: 'reset-blocked', route: 'group-active', scene: 'reset-blocked-by-members' },
     { id: 'reset-preview', route: 'group-lagging', scene: 'reset-preview-latest' },
     { id: 'reset-held', route: 'group-lagging', scene: 'reset-held-stub' },
-    { id: 'brokers', route: 'brokers' },
+    { id: 'cluster', route: 'cluster' },
     { id: 'truncate', route: 'destinations', scene: 'truncate-preview' },
     { id: 'register', route: 'register-kafka', scene: 'checked-stub', fullPage: 1800 },
     {

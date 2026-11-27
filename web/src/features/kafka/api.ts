@@ -21,7 +21,7 @@ export const keys = {
   brokerConfig: (c: string, b: string) => clusterKey(c, 'kafka', 'broker-config', b),
   acls: (c: string, f: AclFilter) => clusterKey(c, 'kafka', 'acls', f),
   transactions: (c: string) => clusterKey(c, 'kafka', 'transactions'),
-  brokers: (c: string) => clusterKey(c, 'kafka', 'brokers'),
+  cluster: (c: string) => clusterKey(c, 'kafka', 'cluster'),
 };
 
 // ── Groups ───────────────────────────────────────────────────────────────────
@@ -265,14 +265,15 @@ export function useAbortHanging(clusterId: string) {
 
 // ── Brokers ──────────────────────────────────────────────────────────────────
 
-export type KafkaBroker = Schemas['BrokerRow'];
+export type ClusterView = Schemas['ClusterView'];
+export type ClusterBroker = Schemas['ClusterBroker'];
 export type QuorumVoter = Schemas['QuorumVoter'];
-export type Brokers = Schemas['Brokers'];
 
-export function useKafkaBrokers(clusterId: string, enabled = true): UseQueryResult<Brokers, ApiError> {
+/** The cluster, brokers and quorum together. The same cadence the brokers list had. */
+export function useKafkaCluster(clusterId: string, enabled = true): UseQueryResult<ClusterView, ApiError> {
   return useQuery({
-    queryKey: keys.brokers(clusterId),
-    queryFn: () => request<Brokers>(`${base(clusterId)}/brokers`),
+    queryKey: keys.cluster(clusterId),
+    queryFn: () => request<ClusterView>(`${base(clusterId)}/cluster`),
     enabled,
     refetchInterval: 15_000,
   });

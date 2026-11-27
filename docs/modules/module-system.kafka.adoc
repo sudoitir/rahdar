@@ -9,7 +9,7 @@
 * `i.g.s.r.s.k.KafkaAcls`
 * `i.g.s.r.s.k.KafkaBrokerConfigChanges`
 * `i.g.s.r.s.k.KafkaBrokerConfigs`
-* `i.g.s.r.s.k.KafkaBrokers`
+* `i.g.s.r.s.k.KafkaClusterView`
 * `i.g.s.r.s.k.KafkaGroups`
 * `i.g.s.r.s.k.KafkaHangingAborts`
 * `i.g.s.r.s.k.KafkaHangingTransactions`

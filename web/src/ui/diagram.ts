@@ -23,6 +23,8 @@ export interface DiagramEdge {
   label?: string;
   /** Drawn dashed: a secondary path. Its meaning belongs in its label. */
   dashed?: boolean;
+  /** Line thickness, as a CSS custom property. It does not move a box. */
+  weight?: number;
   /** Something can be inserted on this arrow: it offers the diagram's `insertChoices`. */
   insertable?: boolean;
 }

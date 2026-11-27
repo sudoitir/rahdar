@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
@@ -274,7 +275,7 @@ const Card = memo(function Card({ id, data }: NodeProps<Node<CardData>>) {
   );
 });
 
-type LineData = { dashed?: boolean; insert?: string };
+type LineData = { dashed?: boolean; insert?: string; weight?: number };
 
 /**
  * A line with its label as a chip. The label is also in the target's accessible name, so the chip is
@@ -312,6 +313,7 @@ const Line = memo(function Line({
         className={d.dashed ? classes.dashed : classes.edge}
         markerEnd={markerEnd}
         interactionWidth={0}
+        style={d.weight == null ? undefined : ({ '--edge-weight': d.weight } as CSSProperties)}
       />
       {label || insert ? (
         <EdgeLabelRenderer>
@@ -523,7 +525,11 @@ export function DiagramView({
       target: e.target,
       type: 'line',
       label: e.label,
-      data: { dashed: e.dashed, insert: inserting && e.insertable ? insertName(e, nodes) : undefined },
+      data: {
+        dashed: e.dashed,
+        weight: e.weight,
+        insert: inserting && e.insertable ? insertName(e, nodes) : undefined,
+      },
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
       focusable: false,
     }));
