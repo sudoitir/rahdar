@@ -64,6 +64,7 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `artemis_config_change` | اعلام یک پیکربندی، یا اعمال آن اول روی قناری با تصدیق خطرها بر اساس شناسه |
 | Tool | `connection_action` | بستن یک اتصال، کانال، مصرف‌کننده یا مصرف‌کننده‌های یک مقصد |
 | Tool | `send_message` | صف‌کردن یک پیام |
+| Tool | `kafka_describe_cluster` | کلاستر، همان حقایق صفحه: بروکرها، حد نصاب، یال‌های replica مشترک و همان جمع‌ها؛ به `cluster:read` نیاز دارد |
 | Tool | `kafka_list_groups`، `kafka_describe_group` | گروه‌های مصرف‌کننده با وضعیت، اعضا و lag؛ و پارتیشن‌ها و اعضای یک گروه |
 | Tool | `kafka_preview_offset_reset`، `kafka_reset_offsets` | اینکه یک بازنشانی چه چیزی را جابه‌جا می‌کند، و خودِ بازنشانی که روی همان پیش‌نمایش اجرا می‌شود |
 | Tool | `kafka_topic_config`، `kafka_set_topic_config` | تنظیمات یک topic و منشأ هرکدام، و تغییر آن‌ها |
@@ -79,7 +80,7 @@ curl -s https://rahdar.example.com/mcp \
 
 ابزارها یک منبع را با **شناسهٔ استاندارد** آن نام می‌برند، مثل `artemis.queue/orders`؛ همان `id` که `list_resources` در هر ردیف برمی‌گرداند، همراه با `kind` و `kindLabel` که سیستم به آن می‌دهد. آرگومان‌ها بر اساس چیستیِ منبع نام دارند: `subscription`، `destination`، `resource` (هدف چرخهٔ حیات) و `target`. `list_resources` همان `role` را می‌گیرد که باید فهرست شود — یکی از `destination`، `subscription`، `route`، `connection`، `channel`، `consumer` و `producer` — و در صورت نیاز یک `kind`.
 
-ابزاری که فقط برای یک سیستم بروکر وجود دارد، شناسهٔ آن سیستم را پیشوند دارد: `artemis_config`، `artemis_config_change`، `artemis_config_diff`، `artemis_divert_lifecycle`، هشت ابزار `kafka_*` و `setup_review`. فقط به کلیدی عرضه می‌شود که بتواند کلاستری از آن سیستم را بخواند، و فراخوانی‌ای که کلاستر سیستم دیگری را نام ببرد خطای ابزاری می‌گیرد که می‌گوید آن کلاستر چه سیستمی را اجرا می‌کند.
+ابزاری که فقط برای یک سیستم بروکر وجود دارد، شناسهٔ آن سیستم را پیشوند دارد: `artemis_config`، `artemis_config_change`، `artemis_config_diff`، `artemis_divert_lifecycle`، ابزارهای `kafka_*` و `setup_review`. فقط به کلیدی عرضه می‌شود که بتواند کلاستری از آن سیستم را بخواند، و فراخوانی‌ای که کلاستر سیستم دیگری را نام ببرد خطای ابزاری می‌گیرد که می‌گوید آن کلاستر چه سیستمی را اجرا می‌کند.
 
 ## قرارداد ایمنی
 
