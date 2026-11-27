@@ -51,12 +51,12 @@ public class KafkaBrokers {
         List<BrokerRow> brokers = new ArrayList<>();
         List<QuorumVoter> voters = new ArrayList<>();
         String leader = null;
-        String mode = null;
+        String raw = null;
         Set<NodeId> seen = new HashSet<>();
         for (NodeDescription node : described.value()) {
             seen.add(node.node());
-            if (mode == null) {
-                mode = node.attributes()
+            if (raw == null) {
+                raw = node.attributes()
                         .raw("kafka.cluster_mode")
                         .map(String::valueOf)
                         .orElse(null);
@@ -93,8 +93,13 @@ public class KafkaBrokers {
                         0));
             }
         });
-        boolean kraft = mode != null ? "kraft".equalsIgnoreCase(mode) : !voters.isEmpty();
+        boolean kraft = "KRaft".equals(mode(raw, !voters.isEmpty()));
         return new Brokers(kraft ? "KRaft" : "ZooKeeper", brokers, quorum(kraft, voters, leader));
+    }
+
+    /** The words {@link #read} shows. Absent is KRaft only when the cluster reported voters. */
+    static String mode(String raw, boolean hasVoters) {
+        return (raw != null ? "kraft".equalsIgnoreCase(raw) : hasVoters) ? "KRaft" : "ZooKeeper";
     }
 
     private static BrokerRow broker(NodeDescription node, BrokerException failure, List<Resource> partitions) {
@@ -136,7 +141,7 @@ public class KafkaBrokers {
                 offline);
     }
 
-    private static BrokerQuorum quorum(boolean kraft, List<QuorumVoter> voters, String leader) {
+    static BrokerQuorum quorum(boolean kraft, List<QuorumVoter> voters, String leader) {
         if (voters.isEmpty()) {
             return new BrokerQuorum(
                     false,
