@@ -127,6 +127,7 @@ class McpSystemToolsTest {
         when(perm.canSeeCluster(other)).thenReturn(true);
         assertThat(kafkaCatalog().toolNames())
                 .containsExactlyInAnyOrder(
+                        "kafka_describe_cluster",
                         "kafka_list_groups",
                         "kafka_describe_group",
                         "kafka_preview_offset_reset",
