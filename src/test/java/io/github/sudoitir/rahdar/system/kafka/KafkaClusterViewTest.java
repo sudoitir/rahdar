@@ -250,6 +250,20 @@ class KafkaClusterViewTest {
     }
 
     @Test
+    void aControllerWithoutAVersionDoesNotHideTheBrokerRelease() {
+        describe(controller("100"), kraft("1", true, "3.9"));
+
+        assertThat(view.read(CLUSTER).notes()).contains(KafkaClusterView.FENCE_GAP);
+    }
+
+    @Test
+    void aClusterThatReportsNoVersionDoesNotGuessTheFenceGap() {
+        describe(controller("100"), kraft("1", true));
+
+        assertThat(view.read(CLUSTER).notes()).doesNotContain(KafkaClusterView.FENCE_GAP);
+    }
+
+    @Test
     void aBrokerIdThatIsNotANumberKeepsThatIdAndNoCounters() {
         when(nodes.describe(Scope.whole()))
                 .thenReturn(new Partial<>(

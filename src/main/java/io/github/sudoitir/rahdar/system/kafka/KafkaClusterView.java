@@ -160,7 +160,12 @@ public class KafkaClusterView {
         return new BrokerQuorum(true, null, leader, voters, leader != null && caughtUp * 2 > voters.size());
     }
 
-    /** A KRaft cluster whose reported release is before 4.0. An unreadable version stays unstated. */
+    /**
+     * A KRaft cluster whose reported release is before 4.0. An unreadable version stays unstated.
+     *
+     * <p>The node read does not carry the metadata.version level the driver uses to decide whether fenced brokers are
+     * listed, so this uses the release major. A cluster labelled below 4.0 that still lists them is not told apart.
+     */
     static Optional<String> fenceNote(String mode, String version) {
         if (!"KRaft".equals(mode)) {
             return Optional.empty();
@@ -317,25 +322,34 @@ public class KafkaClusterView {
                 omitted);
     }
 
+    /** The first release a node actually reported. One with none does not hide a later one. */
+    private static String reportedVersion(Partial<List<NodeDescription>> described) {
+        for (NodeDescription node : described.value()) {
+            String reported = node.attributes()
+                    .raw("kafka.cluster_version")
+                    .map(String::valueOf)
+                    .filter(value -> !value.isBlank())
+                    .orElse(null);
+            if (reported != null) {
+                return reported;
+            }
+        }
+        return null;
+    }
+
     private static Nodes nodes(Partial<List<NodeDescription>> described) {
         List<Described> brokers = new ArrayList<>();
         List<ClusterController> controllers = new ArrayList<>();
         List<QuorumVoter> voters = new ArrayList<>();
         String leader = null;
         String rawMode = null;
-        String version = null;
+        String version = reportedVersion(described);
         Set<NodeId> seen = new HashSet<>();
         for (NodeDescription node : described.value()) {
             seen.add(node.node());
             if (rawMode == null) {
                 rawMode = node.attributes()
                         .raw("kafka.cluster_mode")
-                        .map(String::valueOf)
-                        .orElse(null);
-            }
-            if (version == null) {
-                version = node.attributes()
-                        .raw("kafka.cluster_version")
                         .map(String::valueOf)
                         .orElse(null);
             }
