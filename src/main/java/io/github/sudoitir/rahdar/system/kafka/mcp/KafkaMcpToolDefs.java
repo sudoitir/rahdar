@@ -36,6 +36,9 @@ public final class KafkaMcpToolDefs {
 
     public static final List<McpToolDef> ALL = List.of(
             read(
+                    "kafka_describe_cluster",
+                    "A Kafka cluster's brokers, quorum, co-replication and partitions that need attention."),
+            read(
                     "kafka_list_groups",
                     "A page of a Kafka cluster's consumer and share groups with their state and lag.",
                     Param.values("type", List.of("consumer", "share"), "Omit for both."),

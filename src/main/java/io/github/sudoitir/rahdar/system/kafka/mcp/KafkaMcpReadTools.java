@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.system.kafka.mcp;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAcls;
+import io.github.sudoitir.rahdar.system.kafka.KafkaClusterView;
 import io.github.sudoitir.rahdar.system.kafka.KafkaGroups;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
@@ -45,6 +46,21 @@ public class KafkaMcpReadTools {
     private final KafkaHangingTransactions hanging;
     private final KafkaPartitionReads partitions;
     private final KafkaReplication replication;
+    private final KafkaClusterView clusterView;
+
+    @McpTool(
+            name = "kafka_describe_cluster",
+            description = "A Kafka cluster's brokers, quorum, co-replication and partitions that need attention.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaDescribeCluster(@McpToolParam(required = true) String clusterId) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        return McpErrors.guard(() -> KafkaMcpViews.cluster(clusterView.read(id)));
+    }
 
     @McpTool(
             name = "kafka_list_groups",
