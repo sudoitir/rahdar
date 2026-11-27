@@ -492,12 +492,26 @@ public final class KafkaViews {
             boolean reachable,
 
             @Schema(nullable = true) String reason,
-            @Schema(requiredMode = REQUIRED) long leaders,
-            @Schema(requiredMode = REQUIRED) long replicasHeld,
-            @Schema(requiredMode = REQUIRED) long outOfSyncReplicas,
 
-            @Schema(requiredMode = REQUIRED, description = "Partitions it replicates that have no leader.")
-            long offlineReplicas,
+            @Schema(
+                    nullable = true,
+                    description = "Absent when the broker id is not a number. Never zero for an unknown.")
+            Long leaders,
+
+            @Schema(
+                    nullable = true,
+                    description = "Absent when the broker id is not a number. Never zero for an unknown.")
+            Long replicasHeld,
+
+            @Schema(
+                    nullable = true,
+                    description = "Absent when the broker id is not a number. Never zero for an unknown.")
+            Long outOfSyncReplicas,
+
+            @Schema(
+                    nullable = true,
+                    description = "Partitions it replicates that have no leader. Absent when the id is not a number.")
+            Long offlineReplicas,
 
             @Schema(requiredMode = REQUIRED) boolean quorumLeader) {}
 
@@ -558,5 +572,10 @@ public final class KafkaViews {
             List<String> topics,
 
             @Schema(nullable = true, description = "Set when the topic names need destination:read.")
-            String topicsWithheld) {}
+            String topicsWithheld,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Topic names not in the list: past the cap, or all of them when withheld.")
+            long topicsOmitted) {}
 }

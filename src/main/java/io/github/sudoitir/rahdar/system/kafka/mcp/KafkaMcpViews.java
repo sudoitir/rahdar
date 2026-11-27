@@ -39,16 +39,12 @@ final class KafkaMcpViews {
 
     /**
      * The cluster the screen reads. Topic names are already capped, and withheld without {@code destination:read}, by
-     * the service; this only says so when that cap applied.
-     *
-     * <p>ponytail: exactly {@link #TOP} names reads as capped, because the service does not say how many it dropped.
-     * A count on {@code ClusterProblems} would tell them apart.
+     * the service; this only says so when that cap left names out.
      */
     static ClusterAnswer cluster(ClusterView view) {
-        boolean capped = view.problems().topicsWithheld() == null
-                && view.problems().topics().size() == TOP;
-        return new ClusterAnswer(
-                view, capped, capped ? "Topic names are the first " + TOP + " that need attention." : null);
+        long omitted = view.problems().topicsOmitted();
+        boolean capped = view.problems().topicsWithheld() == null && omitted > 0;
+        return new ClusterAnswer(view, capped, capped ? omitted + " more topic names need attention." : null);
     }
 
     record TopicLag(

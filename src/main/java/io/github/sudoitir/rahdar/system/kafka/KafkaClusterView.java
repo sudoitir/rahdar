@@ -5,8 +5,6 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.Partial;
-import io.github.sudoitir.openbroker.access.Assessment;
-import io.github.sudoitir.openbroker.access.Capability;
 import io.github.sudoitir.openbroker.kafka.admin.KafkaKinds;
 import io.github.sudoitir.openbroker.kafka.admin.Topology;
 import io.github.sudoitir.openbroker.model.Condition;
@@ -68,8 +66,12 @@ public class KafkaClusterView {
 
     static final String PLACEMENT_UNREAD = "Placement was not read";
 
-    /** A fenced broker is not listed before Kafka 4.0. The view repeats the driver's reason. */
-    static final Capability FENCED_BROKERS = new Capability("kafka.fenced-brokers");
+    /**
+     * The driver's own words for a KRaft cluster older than 4.0. Taken from the version the node read already
+     * reported, so the note is the same snapshot as the boxes.
+     */
+    static final String FENCE_GAP =
+            "Kafka before 4.0 does not list fenced brokers, so a fenced broker is missing from the nodes instead of shown as fenced.";
 
     /** Leader, replicas and the in-sync set. Offsets and log dirs would wait on a broker that is down. */
     private static final Set<String> PLACEMENT =
@@ -95,10 +97,8 @@ public class KafkaClusterView {
         List<String> notes = new ArrayList<>();
         String mode = viewMode(nodes.rawMode());
         BrokerQuorum quorum = quorum(mode, nodes.voters(), nodes.leader(), notes);
+        fenceNote(mode, nodes.version()).ifPresent(notes::add);
         Placement placement = placement(connection, notes);
-        if ("KRaft".equals(mode) || "Unknown".equals(mode)) {
-            fenceNote(connection).ifPresent(notes::add);
-        }
         boolean names = access.holds(clusterId, Permissions.DESTINATION_READ);
         Derived derived = derive(nodes, placement.partitions());
         boolean capped = placement.read() && derived.topics() >= TOPIC_CAP;
@@ -143,17 +143,30 @@ public class KafkaClusterView {
         return KafkaBrokers.quorum(true, voters, leader);
     }
 
-    private static Optional<String> fenceNote(ClusterConnection connection) {
-        try {
-            Assessment assessment =
-                    KafkaFailures.call(() -> connection.access().check(FENCED_BROKERS, Optional.empty()));
-            if (assessment.status() == Assessment.Status.UNAVAILABLE && assessment.reason() != null) {
-                return Optional.of(assessment.reason());
-            }
+    /** A KRaft cluster whose reported release is before 4.0. An unreadable version stays unstated. */
+    static Optional<String> fenceNote(String mode, String version) {
+        if (!"KRaft".equals(mode)) {
             return Optional.empty();
-        } catch (RuntimeException e) {
-            return Optional.of("Fenced brokers could not be read: " + e.getMessage());
         }
+        Integer major = major(version);
+        return major != null && major < 4 ? Optional.of(FENCE_GAP) : Optional.empty();
+    }
+
+    private static Integer major(String version) {
+        if (version == null || version.isBlank()) {
+            return null;
+        }
+        String digits = version.toLowerCase(Locale.ROOT);
+        if (digits.startsWith("at least ")) {
+            digits = digits.substring("at least ".length());
+        } else if (digits.startsWith("before ")) {
+            digits = digits.substring("before ".length());
+        }
+        int end = 0;
+        while (end < digits.length() && Character.isDigit(digits.charAt(end))) {
+            end++;
+        }
+        return end == 0 ? null : Integer.valueOf(digits.substring(0, end));
     }
 
     private static Placement placement(ClusterConnection connection, List<String> notes) {
@@ -169,7 +182,9 @@ public class KafkaClusterView {
     private static Derived derive(Nodes nodes, List<Resource> partitions) {
         Map<Integer, long[]> counts = new HashMap<>();
         for (Described broker : nodes.brokers()) {
-            counts.put(broker.id(), new long[4]);
+            if (broker.id() != null) {
+                counts.put(broker.id(), new long[4]);
+            }
         }
         Map<Pair, long[]> pairs = new TreeMap<>();
         long under = 0;
@@ -226,17 +241,17 @@ public class KafkaClusterView {
         }
         List<ClusterBroker> brokers = new ArrayList<>();
         for (Described broker : nodes.brokers()) {
-            long[] count = counts.getOrDefault(broker.id(), new long[4]);
+            long[] count = broker.id() == null ? null : counts.get(broker.id());
             brokers.add(new ClusterBroker(
                     broker.nativeId(),
                     broker.rack(),
                     broker.address(),
                     broker.reachable(),
                     broker.reason(),
-                    count[0],
-                    count[1],
-                    count[2],
-                    count[3],
+                    count == null ? null : count[0],
+                    count == null ? null : count[1],
+                    count == null ? null : count[2],
+                    count == null ? null : count[3],
                     broker.quorumLeader()));
         }
         List<CoReplication> edges = new ArrayList<>();
@@ -273,8 +288,16 @@ public class KafkaClusterView {
 
     private static ClusterProblems problems(Derived derived, boolean names) {
         List<String> topics = names ? derived.attention().stream().limit(TOP).toList() : List.of();
+        long omitted = names
+                ? derived.attention().size() - topics.size()
+                : derived.attention().size();
         return new ClusterProblems(
-                derived.offline(), derived.under(), derived.preferred(), topics, names ? null : TOPICS_WITHHELD);
+                derived.offline(),
+                derived.under(),
+                derived.preferred(),
+                topics,
+                names ? null : TOPICS_WITHHELD,
+                omitted);
     }
 
     private static Nodes nodes(Partial<List<NodeDescription>> described) {
@@ -283,12 +306,19 @@ public class KafkaClusterView {
         List<QuorumVoter> voters = new ArrayList<>();
         String leader = null;
         String rawMode = null;
+        String version = null;
         Set<NodeId> seen = new HashSet<>();
         for (NodeDescription node : described.value()) {
             seen.add(node.node());
             if (rawMode == null) {
                 rawMode = node.attributes()
                         .raw("kafka.cluster_mode")
+                        .map(String::valueOf)
+                        .orElse(null);
+            }
+            if (version == null) {
+                version = node.attributes()
+                        .raw("kafka.cluster_version")
                         .map(String::valueOf)
                         .orElse(null);
             }
@@ -326,7 +356,7 @@ public class KafkaClusterView {
                     false,
                     id(failure.getKey().value())));
         }
-        return new Nodes(rawMode, brokers, controllers, voters, leader);
+        return new Nodes(rawMode, version, brokers, controllers, voters, leader);
     }
 
     private static Described described(NodeDescription node, BrokerException failure) {
@@ -363,16 +393,18 @@ public class KafkaClusterView {
                 .orElse(false);
     }
 
-    private static int id(String nativeId) {
+    /** Null when the native id is not a broker number, so its partitions cannot be counted. */
+    private static Integer id(String nativeId) {
         try {
-            return Integer.parseInt(nativeId);
+            return Integer.valueOf(nativeId);
         } catch (NumberFormatException _) {
-            return Integer.MIN_VALUE;
+            return null;
         }
     }
 
     private record Nodes(
             String rawMode,
+            String version,
             List<Described> brokers,
             List<ClusterController> controllers,
             List<QuorumVoter> voters,
@@ -385,7 +417,7 @@ public class KafkaClusterView {
             boolean reachable,
             String reason,
             boolean quorumLeader,
-            int id) {}
+            Integer id) {}
 
     private record Placement(List<Resource> partitions, boolean read, String reason) {}
 

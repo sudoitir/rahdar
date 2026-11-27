@@ -10,13 +10,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.openbroker.ErrorInfo;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.Partial;
 import io.github.sudoitir.openbroker.Plane;
-import io.github.sudoitir.openbroker.access.Access;
-import io.github.sudoitir.openbroker.access.Assessment;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.kafka.KafkaOptions;
 import io.github.sudoitir.openbroker.kafka.admin.KafkaKinds;
 import io.github.sudoitir.openbroker.model.Attributes;
@@ -48,6 +50,7 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.CoReplication;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -62,7 +65,6 @@ class KafkaClusterViewTest {
 
     private final Resources resources = mock(Resources.class);
     private final Nodes nodes = mock(Nodes.class);
-    private final Access brokerAccess = mock(Access.class);
     private final ClusterConnection connection = mock(ClusterConnection.class);
     private final BrokerGateway gateway = mock(BrokerGateway.class);
     private final ClusterAccessGuard access = mock(ClusterAccessGuard.class);
@@ -73,7 +75,6 @@ class KafkaClusterViewTest {
         when(gateway.cluster(CLUSTER)).thenReturn(connection);
         when(connection.resources()).thenReturn(resources);
         when(connection.nodes()).thenReturn(nodes);
-        when(connection.access()).thenReturn(brokerAccess);
         ActorResolver actors = mock(ActorResolver.class);
         when(actors.resolve()).thenReturn(new Actor("test-admin", null, null, null));
         when(heavy.run(any(), any(), any())).thenAnswer(invocation -> {
@@ -88,7 +89,6 @@ class KafkaClusterViewTest {
         when(nodes.describe(Scope.whole())).thenReturn(Partial.complete(List.of(), List.of()));
         when(resources.read(any(ResourceQuery.class)))
                 .thenReturn(Partial.complete(new ResourcePage(List.of(), Optional.empty()), List.of()));
-        when(brokerAccess.check(any(), any())).thenReturn(Assessment.available("fenced brokers are listed"));
     }
 
     @Test
@@ -108,8 +108,8 @@ class KafkaClusterViewTest {
                 .extracting(CoReplication::a, CoReplication::b)
                 .containsExactly(tuple("1", "2"), tuple("2", "3"));
         assertThat(cluster.edges()).allMatch(edge -> edge.outOfSyncReplicas() == 0);
-        assertThat(cluster.brokers().getFirst().leaders()).isEqualTo(1);
-        assertThat(cluster.brokers().getFirst().replicasHeld()).isEqualTo(1);
+        assertThat(cluster.brokers().getFirst().leaders()).isEqualTo(1L);
+        assertThat(cluster.brokers().getFirst().replicasHeld()).isEqualTo(1L);
         assertThat(cluster.totals().topics()).isEqualTo(1);
         assertThat(cluster.totals().partitions()).isEqualTo(2);
         assertThat(cluster.totals().brokersReached()).isEqualTo(3);
@@ -131,8 +131,8 @@ class KafkaClusterViewTest {
         ClusterBroker third = cluster.brokers().get(2);
         assertThat(third.reachable()).isFalse();
         assertThat(third.reason()).contains("fenced");
-        assertThat(third.replicasHeld()).isEqualTo(1);
-        assertThat(third.outOfSyncReplicas()).isEqualTo(1);
+        assertThat(third.replicasHeld()).isEqualTo(1L);
+        assertThat(third.outOfSyncReplicas()).isEqualTo(1L);
         assertThat(third.offlineReplicas()).isZero();
         assertThat(cluster.totals().underReplicated()).isEqualTo(1);
         assertThat(cluster.quorum().majority()).isTrue();
@@ -215,18 +215,62 @@ class KafkaClusterViewTest {
 
         assertThat(shown.problems().topics()).containsExactly("orders");
         assertThat(shown.problems().topicsWithheld()).isNull();
+        assertThat(shown.problems().topicsOmitted()).isZero();
+        assertThat(withheld.problems().topicsOmitted()).isEqualTo(1);
+    }
+
+    @Test
+    void topicNamesPastTheCapSayHowManyWereLeftOut() {
+        describe(kraft("1", false));
+        when(access.holds(CLUSTER, Permissions.DESTINATION_READ)).thenReturn(true);
+        List<Resource> sick = new ArrayList<>();
+        for (int i = 0; i < KafkaClusterView.TOP + 5; i++) {
+            sick.add(partition("t" + i, 0, 2, List.of(1, 2), List.of(1, 2)));
+        }
+        partitions(sick);
+
+        ClusterView cluster = view.read(CLUSTER);
+
+        assertThat(cluster.problems().topics()).hasSize(KafkaClusterView.TOP);
+        assertThat(cluster.problems().topicsOmitted()).isEqualTo(5);
+        assertThat(cluster.problems().topicsWithheld()).isNull();
     }
 
     @Test
     void aKraftClusterBefore4DoesNotReadAMissingBrokerAsHealthy() {
-        describe(kraft("1", true));
-        when(brokerAccess.check(any(), any()))
-                .thenReturn(Assessment.unavailable("Kafka before 4.0 does not list fenced brokers.", Optional.empty()));
+        describe(kraft("1", true, "4.0"));
+        assertThat(view.read(CLUSTER).notes()).doesNotContain(KafkaClusterView.FENCE_GAP);
 
+        describe(kraft("1", true, "3.9"));
         ClusterView cluster = view.read(CLUSTER);
 
-        assertThat(cluster.notes()).contains("Kafka before 4.0 does not list fenced brokers.");
+        assertThat(cluster.notes()).contains(KafkaClusterView.FENCE_GAP);
         assertThat(cluster.quorum().majority()).isTrue();
+        verify(connection, never()).access();
+    }
+
+    @Test
+    void aBrokerIdThatIsNotANumberKeepsThatIdAndNoCounters() {
+        when(nodes.describe(Scope.whole()))
+                .thenReturn(new Partial<>(
+                        List.of(),
+                        Map.of(),
+                        Map.of(
+                                NodeId.of("broker-a"),
+                                new BrokerException(
+                                        Status.UNAVAILABLE,
+                                        ErrorInfo.of("UNAVAILABLE"),
+                                        Dispatch.NOT_SENT,
+                                        NodeId.of("broker-a"),
+                                        "did not answer"))));
+
+        ClusterBroker broker = view.read(CLUSTER).brokers().getFirst();
+
+        assertThat(broker.id()).isEqualTo("broker-a");
+        assertThat(broker.leaders()).isNull();
+        assertThat(broker.replicasHeld()).isNull();
+        assertThat(broker.outOfSyncReplicas()).isNull();
+        assertThat(broker.offlineReplicas()).isNull();
     }
 
     @Test
@@ -252,11 +296,22 @@ class KafkaClusterViewTest {
     }
 
     private static NodeDescription kraft(String id, boolean leader) {
-        return broker(id, "kraft", true, leader);
+        return kraft(id, leader, null);
+    }
+
+    private static NodeDescription kraft(String id, boolean leader, String version) {
+        return broker(id, "kraft", true, leader, version);
     }
 
     private static NodeDescription broker(String id, String mode, boolean voter, boolean leader) {
+        return broker(id, mode, voter, leader, null);
+    }
+
+    private static NodeDescription broker(String id, String mode, boolean voter, boolean leader, String version) {
         Attributes.Builder attributes = Attributes.builder().putRaw("kafka.cluster_mode", mode);
+        if (version != null) {
+            attributes.putRaw("kafka.cluster_version", version);
+        }
         if (voter) {
             attributes.putRaw("kafka.quorum_voter", true).putRaw("kafka.quorum_lag", 0L);
         }

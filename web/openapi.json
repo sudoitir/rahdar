@@ -49143,27 +49143,30 @@
             "type" : [ "string", "null" ]
           },
           "leaders" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the broker id is not a number. Never zero for an unknown."
           },
           "replicasHeld" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the broker id is not a number. Never zero for an unknown."
           },
           "outOfSyncReplicas" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the broker id is not a number. Never zero for an unknown."
           },
           "offlineReplicas" : {
-            "type" : "integer",
+            "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "Partitions it replicates that have no leader."
+            "description" : "Partitions it replicates that have no leader. Absent when the id is not a number."
           },
           "quorumLeader" : {
             "type" : "boolean"
           }
         },
-        "required" : [ "id", "leaders", "offlineReplicas", "outOfSyncReplicas", "quorumLeader", "reachable", "replicasHeld" ]
+        "required" : [ "id", "quorumLeader", "reachable" ]
       },
       "ClusterController" : {
         "type" : "object",
@@ -49210,9 +49213,14 @@
           "topicsWithheld" : {
             "type" : [ "string", "null" ],
             "description" : "Set when the topic names need destination:read."
+          },
+          "topicsOmitted" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Topic names not in the list: past the cap, or all of them when withheld."
           }
         },
-        "required" : [ "offline", "preferredLeaderMismatches", "topics", "underReplicated" ]
+        "required" : [ "offline", "preferredLeaderMismatches", "topics", "topicsOmitted", "underReplicated" ]
       },
       "ClusterTotals" : {
         "type" : "object",

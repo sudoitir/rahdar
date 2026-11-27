@@ -125,7 +125,7 @@ class KafkaMcpViewsTest {
 
     @Test
     void aClusterAnswerNotesTheTopicNameCapAndKeepsTheServicesView() {
-        ClusterView few = cluster(List.of("orders"), null);
+        ClusterView few = cluster(List.of("orders"), null, 0);
         var open = KafkaMcpViews.cluster(few);
         assertThat(open.cluster()).isSameAs(few);
         assertThat(open.truncated()).isFalse();
@@ -133,16 +133,19 @@ class KafkaMcpViewsTest {
 
         List<String> names =
                 IntStream.range(0, KafkaMcpViews.TOP).mapToObj(i -> "t" + i).toList();
-        var closed = KafkaMcpViews.cluster(cluster(names, null));
-        assertThat(closed.truncated()).isTrue();
-        assertThat(closed.note()).contains(String.valueOf(KafkaMcpViews.TOP));
+        var exact = KafkaMcpViews.cluster(cluster(names, null, 0));
+        assertThat(exact.truncated()).isFalse();
 
-        var withheld = KafkaMcpViews.cluster(cluster(List.of(), "Topic names need destination:read."));
+        var closed = KafkaMcpViews.cluster(cluster(names, null, 380));
+        assertThat(closed.truncated()).isTrue();
+        assertThat(closed.note()).contains("380");
+
+        var withheld = KafkaMcpViews.cluster(cluster(List.of(), "Topic names need destination:read.", 12));
         assertThat(withheld.truncated()).isFalse();
         assertThat(withheld.cluster().problems().topicsWithheld()).isNotNull();
     }
 
-    private static ClusterView cluster(List<String> topics, String withheld) {
+    private static ClusterView cluster(List<String> topics, String withheld, long omitted) {
         return new ClusterView(
                 "KRaft",
                 true,
@@ -152,7 +155,7 @@ class KafkaMcpViewsTest {
                 new BrokerQuorum(true, null, "1", List.of(), true),
                 List.of(),
                 new ClusterTotals(3, 7, 1, 2L, 6L, 13, 0, 1, false),
-                new ClusterProblems(0, 13, 1, topics, withheld),
+                new ClusterProblems(0, 13, 1, topics, withheld, omitted),
                 List.of());
     }
 }
