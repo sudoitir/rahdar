@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { SegmentedControl, Stack, Text } from '@mantine/core';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 
@@ -28,6 +29,27 @@ function figure(n: number | null | undefined): string {
 /** Placement was not read: a zero would be an invented total. A capped read is a floor, and its numbers stand. */
 function counted(view: Cluster, n: number): number | null {
   return view.totals.topics == null && !view.totals.atLeast ? null : n;
+}
+
+/** A floor, not a total. The word sits with the figure so a partial read is not read as everything. */
+function floorStat(view: Cluster, n: number): ReactNode {
+  const known = counted(view, n);
+  if (known == null) return null;
+  const text = known.toLocaleString();
+  if (!view.totals.atLeast) return text;
+  return (
+    <>
+      <span className={styles.atLeast}>at least </span>
+      {text}
+    </>
+  );
+}
+
+function floorText(view: Cluster, n: number): string {
+  const known = counted(view, n);
+  if (known == null) return 'Unknown';
+  const text = known.toLocaleString();
+  return view.totals.atLeast ? `at least ${text}` : text;
 }
 
 function leaderWord(view: Cluster): string {
@@ -185,19 +207,11 @@ function Totals({ view }: Readonly<{ view: Cluster }>) {
         value={view.totals.partitions == null ? null : view.totals.partitions.toLocaleString()}
         unavailableReason={reason}
       />
-      <Stat
-        label="Under-replicated"
-        value={counted(view, view.totals.underReplicated)?.toLocaleString() ?? null}
-        unavailableReason={reason}
-      />
-      <Stat
-        label="No leader"
-        value={counted(view, view.totals.offline)?.toLocaleString() ?? null}
-        unavailableReason={reason}
-      />
+      <Stat label="Under-replicated" value={floorStat(view, view.totals.underReplicated)} unavailableReason={reason} />
+      <Stat label="No leader" value={floorStat(view, view.totals.offline)} unavailableReason={reason} />
       <Stat
         label="Not preferred leader"
-        value={counted(view, view.totals.preferredLeaderMismatches)?.toLocaleString() ?? null}
+        value={floorStat(view, view.totals.preferredLeaderMismatches)}
         unavailableReason={reason}
       />
       <Stat
@@ -262,9 +276,9 @@ function Attention({ clusterId, view }: Readonly<{ clusterId: string; view: Clus
           label="Partitions needing attention"
           columns={2}
           items={[
-            { term: 'No leader', value: figure(counted(view, problems.offline)) },
-            { term: 'Under-replicated', value: figure(counted(view, problems.underReplicated)) },
-            { term: 'Not preferred leader', value: figure(counted(view, problems.preferredLeaderMismatches)) },
+            { term: 'No leader', value: floorText(view, problems.offline) },
+            { term: 'Under-replicated', value: floorText(view, problems.underReplicated) },
+            { term: 'Not preferred leader', value: floorText(view, problems.preferredLeaderMismatches) },
           ]}
         />
         {problems.topicsWithheld ? (
@@ -362,6 +376,12 @@ function ClusterBody({
   const notes = view.notes.filter((n) => n !== view.reason && n !== view.quorum.reason);
   return (
     <>
+      {!view.complete ? (
+        <Notice tone="info" title="This read is incomplete">
+          {view.reason ??
+            'The cluster was not fully described, so the counts below are at least what was read, not a total.'}
+        </Notice>
+      ) : null}
       <Totals view={view} />
       <div className={styles.body}>
         <div className={styles.main}>
@@ -443,7 +463,7 @@ export function ClusterView() {
     body = <ErrorState error={cluster.error} onRetry={() => void cluster.refetch()} />;
   } else if (!cluster.data) {
     body = (
-      <div className={styles.frame}>
+      <div className={styles.placeholder}>
         <LoadingState label="Loading the cluster" blockSize="100%" />
       </div>
     );

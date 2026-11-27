@@ -226,14 +226,103 @@ describe('the cluster', () => {
     expect(figure).not.toHaveTextContent('0');
     expect(topics.closest('dl')).toHaveTextContent('a floor, not a total');
     const under = screen.getAllByText('Under-replicated')[0]?.closest('dl')?.querySelector('dd');
+    expect(under).toHaveTextContent(/at least/);
     expect(under).toHaveTextContent('4');
     expect(under).not.toHaveTextContent('Unavailable');
+    expect(screen.getByText('This read is incomplete')).toBeInTheDocument();
+    expect(screen.getAllByText(/a floor, not a total/).length).toBeGreaterThan(0);
   });
 
-  it('says why the cluster could not be read', async () => {
+  it('says how many topic names a capped list left out', async () => {
+    stub(
+      cluster({
+        complete: false,
+        reason: 'The cluster describes at most 2000 topics at once, so these figures are a floor, not a total.',
+        totals: {
+          brokers: 2,
+          brokersReached: 1,
+          controllers: 0,
+          topics: null,
+          partitions: null,
+          underReplicated: 4,
+          offline: 1,
+          preferredLeaderMismatches: 0,
+          atLeast: true,
+        },
+        problems: {
+          offline: 1,
+          underReplicated: 4,
+          preferredLeaderMismatches: 0,
+          topics: ['orders'],
+          topicsWithheld: null,
+          topicsOmitted: 14,
+        },
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster?view=table');
+    expect(await screen.findByText('14 topic names are not listed.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'orders' })).toBeInTheDocument();
+  });
+
+  it('holds the graph frame while the cluster loads', async () => {
+    mockKafkaCluster();
+    server.use(http.get('*/api/v1/clusters/k1/kafka/cluster', () => new Promise(() => {})));
+    renderAppAt('/clusters/k1/kafka/cluster');
+    expect(await screen.findByText('Loading the cluster')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says no broker has answered yet, and that Rahdar keeps looking', async () => {
+    stub(cluster({ brokers: [], controllers: [], edges: [] }));
+    renderAppAt('/clusters/k1/kafka/cluster');
+    expect(await screen.findByText('No broker has answered yet')).toBeInTheDocument();
+    expect(screen.getByText('Rahdar keeps looking.')).toBeInTheDocument();
+  });
+
+  it('names the cause and offers retry when the cluster cannot be read', async () => {
     stub({ title: 'Error', detail: 'No broker answered.' }, 502);
     renderAppAt('/clusters/k1/kafka/cluster');
-    expect(await screen.findByText(/No broker answered/)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('No broker answered');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('keeps Cluster listed and disabled without cluster:read, with the reason', async () => {
+    mockKafkaCluster(['destination:read']);
+    server.use(http.get('*/api/v1/clusters/k1/kafka/cluster', () => HttpResponse.json(cluster())));
+    renderAppAt('/clusters/k1/kafka/cluster');
+    const row = await screen.findByRole('link', { name: 'Cluster', description: /cluster:read/ });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(row).toHaveAccessibleDescription(/Opening Cluster needs the cluster:read permission/);
+  });
+
+  it('says how many co-replication pairs the graph leaves undrawn', async () => {
+    const edges = Array.from({ length: 201 }, (_, i) => ({
+      a: '1',
+      b: String(i + 2),
+      sharedPartitions: 201 - i,
+      outOfSyncReplicas: 0,
+    }));
+    const first = BROKERS[0];
+    if (!first) throw new Error('fixture');
+    const brokers = [
+      first,
+      ...edges.map((edge) => ({
+        id: edge.b,
+        rack: null,
+        address: null,
+        reachable: true,
+        reason: null,
+        leaders: 0,
+        replicasHeld: 1,
+        outOfSyncReplicas: 0,
+        offlineReplicas: 0,
+        quorumLeader: false,
+      })),
+    ];
+    stub(cluster({ brokers, edges }));
+    renderAppAt('/clusters/k1/kafka/cluster');
+    expect(await screen.findByText(/1 co-replication pair beyond the strongest 200/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).toBeNull();
   });
 
   it('keeps the table in the address', async () => {

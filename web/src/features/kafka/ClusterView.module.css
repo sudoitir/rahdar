@@ -33,6 +33,21 @@
   block-size: clamp(16rem, 36vh, 22rem);
 }
 
+/* The graph's place while it loads: the same box the diagram will fill, not a spinner on the page. */
+.placeholder {
+  block-size: clamp(16rem, 36vh, 22rem);
+  border: 1px solid var(--as-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--as-canvas-sunken);
+  overflow: hidden;
+}
+
+.atLeast {
+  color: var(--as-text-dimmed);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 400;
+}
+
 .choose {
   padding: 0;
   border: 0;
