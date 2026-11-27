@@ -75,6 +75,33 @@ describe('DiagramView', () => {
     expect(screen.getByRole('button', { name: 'Undo, release. Via undo 1' })).toBeInTheDocument();
   });
 
+  it('reads a longer edge sentence when the chip is only the count', async () => {
+    render(
+      <MantineProvider>
+        <DiagramView
+          nodes={[
+            { id: 'a', label: 'Broker 1' },
+            { id: 'b', label: 'Broker 2' },
+          ]}
+          edges={[
+            {
+              id: 'a-b',
+              source: 'a',
+              target: 'b',
+              label: '1 out of sync',
+              spoken: '1 out of sync of 4 shared partitions',
+            },
+          ]}
+          aria-label="Cluster"
+        />
+      </MantineProvider>,
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Broker 2. Via 1 out of sync of 4 shared partitions' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 out of sync')).toBeInTheDocument();
+  });
+
   it('is one tab stop, moves with the arrow keys and selects with Enter', async () => {
     const onSelect = draw();
     const user = userEvent.setup();

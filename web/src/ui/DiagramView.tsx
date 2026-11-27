@@ -278,8 +278,9 @@ const Card = memo(function Card({ id, data }: NodeProps<Node<CardData>>) {
 type LineData = { dashed?: boolean; insert?: string; weight?: number };
 
 /**
- * A line with its label as a chip. The label is also in the target's accessible name, so the chip is
- * hidden from it. An insertable line carries a "+" beside the chip, named after the boxes it joins.
+ * A line with its label as a chip. That label, or its longer spoken form, is in the target's
+ * accessible name, so the chip is hidden from it. An insertable line carries a "+" beside the chip,
+ * named after the boxes it joins.
  */
 const Line = memo(function Line({
   id,
@@ -510,7 +511,7 @@ export function DiagramView({
           node: n,
           name: nodeName(
             n,
-            edges.filter((e) => e.target === n.id && e.label).map((e) => e.label as string),
+            edges.filter((e) => e.target === n.id && (e.spoken ?? e.label)).map((e) => (e.spoken ?? e.label) as string),
           ),
           selected: n.id === selectedId,
           vertical,

@@ -21,6 +21,11 @@ export interface DiagramEdge {
   source: string;
   target: string;
   label?: string;
+  /**
+   * Read out instead of `label` when the chip must be shorter. The chip's words are a contiguous
+   * run of this, so what is seen is what is heard.
+   */
+  spoken?: string;
   /** Drawn dashed: a secondary path. Its meaning belongs in its label. */
   dashed?: boolean;
   /** Line thickness, as a CSS custom property. It does not move a box. */

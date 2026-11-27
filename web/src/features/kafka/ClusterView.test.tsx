@@ -88,12 +88,29 @@ describe('the cluster', () => {
     renderAppAt('/clusters/k1/kafka/cluster');
     expect(await screen.findByRole('button', { name: /Broker 1/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Broker 2/ })).toHaveAccessibleName(/Not reached. Connection timed out/);
-    expect(screen.getByRole('button', { name: /Broker 2/ })).toHaveAccessibleName(/out of sync/);
+    expect(screen.getByRole('button', { name: /Broker 2/ })).toHaveAccessibleName(
+      /1 out of sync of 4 shared partitions/,
+    );
     expect(screen.queryByRole('button', { name: /^Actions for/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Insert between/ })).toBeNull();
     expect(screen.getByText('1 of 2')).toBeInTheDocument();
     expect(screen.getByText('The quorum has a majority')).toBeInTheDocument();
     expect(screen.getByText('2 of 3 voters are caught up, a majority.')).toBeInTheDocument();
+  });
+
+  it('uses the singular when one voter is caught up', async () => {
+    stub(
+      cluster({
+        quorum: {
+          available: true,
+          leader: '1',
+          majority: true,
+          voters: [{ id: '1', lag: 0, caughtUp: true }],
+        },
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster?view=table');
+    expect(await screen.findByText('1 of 1 voters is caught up, a majority.')).toBeInTheDocument();
   });
 
   it('lists the same brokers in the table, with a link to each configuration', async () => {
@@ -123,6 +140,21 @@ describe('the cluster', () => {
     expect(within(table).getAllByText('Unknown').length).toBeGreaterThanOrEqual(3);
   });
 
+  it('uses the singular when one voter is caught up', async () => {
+    stub(
+      cluster({
+        quorum: {
+          available: true,
+          leader: '1',
+          majority: true,
+          voters: [{ id: '1', lag: 0, caughtUp: true }],
+        },
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster?view=table');
+    expect(await screen.findByText('1 of 1 voters is caught up, a majority.')).toBeInTheDocument();
+  });
+
   it('states that the quorum has no majority as the critical state', async () => {
     stub(
       cluster({
@@ -140,7 +172,7 @@ describe('the cluster', () => {
     );
     renderAppAt('/clusters/k1/kafka/cluster?view=table');
     expect(await screen.findByText('The quorum has no majority')).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Only 1 of 3 voters are caught up, which is not a majority.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Only 1 of 3 voters is caught up, which is not a majority.');
   });
 
   it('says the quorum is unknown on a ZooKeeper cluster, and draws no controller', async () => {

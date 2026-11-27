@@ -223,6 +223,14 @@ function Totals({ view }: Readonly<{ view: Cluster }>) {
   );
 }
 
+function votersCaughtUp(caughtUp: number, voters: number, majority: boolean): string {
+  const verb = caughtUp === 1 ? 'is' : 'are';
+  const count = `${caughtUp} of ${voters} voters ${verb} caught up`;
+  return majority
+    ? `${count}, a majority.`
+    : `Only ${count}, which is not a majority. The controllers cannot commit metadata changes.`;
+}
+
 function Quorum({ view }: Readonly<{ view: Cluster }>) {
   const { quorum } = view;
   const caughtUp = quorum.voters.filter((v) => v.caughtUp).length;
@@ -242,9 +250,7 @@ function Quorum({ view }: Readonly<{ view: Cluster }>) {
             tone={quorum.majority ? 'neutral' : 'danger'}
             title={quorum.majority ? 'The quorum has a majority' : 'The quorum has no majority'}
           >
-            {quorum.majority
-              ? `${caughtUp} of ${quorum.voters.length} voters are caught up, a majority.`
-              : `Only ${caughtUp} of ${quorum.voters.length} voters are caught up, which is not a majority. The controllers cannot commit metadata changes.`}
+            {votersCaughtUp(caughtUp, quorum.voters.length, quorum.majority)}
           </Notice>
           <DataTable
             variant="static"

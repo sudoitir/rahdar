@@ -47,18 +47,18 @@ function place(rack?: string | null, address?: string | null): string | undefine
 }
 
 /**
- * One line. DiagramView names a box by joining kind, label and detail with commas, and draws a
- * problem word before the label while naming it after. Either split fails the check that the visible
- * words are a contiguous run of the accessible name, so the role, the place and the reach are one label.
+ * Two lines. The accessible name is kind, label, detail, in that order (nodeName), and DiagramView
+ * draws them in that order, so the visible words stay a contiguous run of the name. The address is
+ * last in the detail, so ellipsis cuts it before the reach word.
  */
 function brokerNode(broker: ClusterGraphBroker): DiagramNode {
   const where = place(broker.rack, broker.address);
   const reach = broker.reachable ? null : `Not reached. ${broker.reason ?? 'The cluster gave no reason.'}`;
+  const detail = [reach, where].filter(Boolean).join(' · ');
   return {
     id: brokerNodeId(broker.id),
-    label: [`Broker ${broker.id}`, broker.quorumLeader ? 'quorum leader' : null, where, reach]
-      .filter(Boolean)
-      .join(', '),
+    label: [`Broker ${broker.id}`, broker.quorumLeader ? 'quorum leader' : null].filter(Boolean).join(', '),
+    detail: detail || undefined,
   };
 }
 
@@ -67,12 +67,19 @@ function controllerNode(controller: ClusterGraphController): DiagramNode {
   return { id: `controller:${controller.id}`, label: `${role} ${controller.id}` };
 }
 
-function edgeLabel(shared: number, outOfSync: number): string {
+/**
+ * The chip sits in the gap between 240px boxes, so it is the count only. The sentence is what
+ * DiagramView folds into the target's accessible name; the chip's words are a contiguous run of it.
+ * A dashed stroke is the out-of-sync mark.
+ */
+function edgeCopy(shared: number, outOfSync: number): { label: string; spoken: string } {
+  const count = shared.toLocaleString();
   const noun = shared === 1 ? 'partition' : 'partitions';
-  const base = `${shared} shared ${noun}`;
-  if (outOfSync === 0) return base;
-  const sync = outOfSync === 1 ? 'replica is' : 'replicas are';
-  return `${base}, ${outOfSync} ${sync} out of sync`;
+  if (outOfSync > 0) {
+    const label = `${outOfSync.toLocaleString()} out of sync`;
+    return { label, spoken: `${label} of ${count} shared ${noun}` };
+  }
+  return { label: count, spoken: `${count} shared ${noun}` };
 }
 
 /**
@@ -92,7 +99,7 @@ export function clusterGraph(view: ClusterGraphInput): ClusterGraph {
       id: e.id,
       source: brokerNodeId(e.a),
       target: brokerNodeId(e.b),
-      label: edgeLabel(e.sharedPartitions, e.outOfSyncReplicas),
+      ...edgeCopy(e.sharedPartitions, e.outOfSyncReplicas),
       dashed: e.outOfSyncReplicas > 0,
       weight: e.sharedPartitions,
     })),

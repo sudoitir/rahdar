@@ -24,11 +24,17 @@ describe('clusterGraph', () => {
   it('draws a healthy cluster as boxes joined by the pairs that share partitions', () => {
     const graph = clusterGraph(three);
     expect(graph.nodes.map((n) => n.id)).toEqual(['broker:1', 'broker:2', 'broker:3']);
-    expect(graph.nodes[0]?.label).toBe('Broker 1, quorum leader, a · k1:9092');
-    expect(graph.nodes[2]?.label).toBe('Broker 3, k3:9092');
+    expect(graph.nodes[0]).toMatchObject({ label: 'Broker 1, quorum leader', detail: 'a · k1:9092' });
+    expect(graph.nodes[2]).toMatchObject({ label: 'Broker 3', detail: 'k3:9092' });
     expect(graph.edges.map((e) => e.id)).toEqual(['1-3', '1-2', '2-3']);
-    expect(graph.edges[0]).toMatchObject({ label: '9 shared partitions', weight: 9, dashed: false });
-    expect(graph.edges[2]?.label).toBe('1 shared partition');
+    expect(graph.edges[0]).toMatchObject({
+      label: '9',
+      spoken: '9 shared partitions',
+      weight: 9,
+      dashed: false,
+    });
+    expect(graph.edges[2]).toMatchObject({ label: '1', spoken: '1 shared partition' });
+    expect(graph.edges.every((e) => e.spoken?.includes(e.label ?? ''))).toBe(true);
     expect(graph.summary.omittedEdges).toBe(0);
     expect(layoutSignature(graph.nodes, graph.edges, 'RIGHT')).toBe(
       layoutSignature(
@@ -44,16 +50,20 @@ describe('clusterGraph', () => {
       view({
         brokers: [
           { id: '1', reachable: true, quorumLeader: false },
-          { id: '2', reachable: false, reason: 'Connection refused.', quorumLeader: false },
+          { id: '2', address: 'k2:9092', reachable: false, reason: 'Connection refused.', quorumLeader: false },
         ],
         edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 2 }],
       }),
     );
-    expect(graph.nodes[1]?.label).toBe('Broker 2, Not reached. Connection refused.');
+    expect(graph.nodes[1]).toMatchObject({
+      label: 'Broker 2',
+      detail: 'Not reached. Connection refused. · k2:9092',
+    });
     expect(graph.nodes[1]?.state).toBeUndefined();
     expect(graph.edges[0]).toMatchObject({
       dashed: true,
-      label: '4 shared partitions, 2 replicas are out of sync',
+      label: '2 out of sync',
+      spoken: '2 out of sync of 4 shared partitions',
     });
   });
 
