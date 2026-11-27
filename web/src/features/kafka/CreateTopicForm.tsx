@@ -88,9 +88,9 @@ function replicationProblem(value: number | string, brokers: number | null): str
   const factor = Number(value);
   // Number('') is 0. A value that is not a number must stay refused: NaN < 1 is false.
   if (Number.isNaN(factor) || factor < 1) return 'Enter a replication factor of at least 1.';
-  if (brokers === 0) return 'This connection reached no brokers, so a topic cannot be created yet.';
+  if (brokers === 0) return 'This cluster has no brokers, so a topic cannot be created yet.';
   if (brokers != null && factor > brokers) {
-    return `Enter a replication factor from 1 to ${brokers}, the brokers this connection reached.`;
+    return `Enter a replication factor from 1 to ${brokers}, the brokers in this cluster.`;
   }
   return null;
 }
@@ -109,10 +109,12 @@ export function CreateTopicForm({
   brokersReached?: number | null;
   permissionReason?: string | null;
 }>) {
-  const listed = useKafkaCluster(clusterId, opened && brokersReached == null);
+  const listed = useKafkaCluster(clusterId, opened);
+  // The factor is bounded by the roster. brokersReached is only what the last read answered.
+  const known = listed.data?.totals.brokers ?? null;
   const reached = brokersReached ?? listed.data?.totals.brokersReached ?? null;
-  const reachedRef = useRef(reached);
-  reachedRef.current = reached;
+  const knownRef = useRef(known);
+  knownRef.current = known;
   const preview = usePreviewCreateTopic(clusterId);
   const create = useCreateTopic(clusterId);
   const [planned, setPlanned] = useState<TopicPreview | null>(null);
@@ -138,7 +140,7 @@ export function CreateTopicForm({
     validate: {
       name: (value) => (value.trim() ? null : 'Enter the topic name.'),
       partitions: (value) => (Number(value) >= 1 ? null : 'Enter a partition count of at least 1.'),
-      replicationFactor: (value) => replicationProblem(value, reachedRef.current),
+      replicationFactor: (value) => replicationProblem(value, knownRef.current),
     },
   });
 

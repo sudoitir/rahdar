@@ -90,7 +90,7 @@ function brokerColumns(
       kind: 'code',
       priority: 'essential',
     },
-    { id: 'rack', header: 'Rack', accessor: (b) => b.rack ?? '', kind: 'text', priority: 'low' },
+    { id: 'rack', header: 'Rack', accessor: (b) => b.rack ?? 'Not learned', kind: 'text', priority: 'low' },
     {
       id: 'reach',
       header: 'Reach',
@@ -326,7 +326,7 @@ function BrokerAside({
           label={`Broker ${broker.id}`}
           columns={1}
           items={[
-            { term: 'Rack', value: broker.rack ?? 'None' },
+            { term: 'Rack', value: broker.rack ?? 'Not learned' },
             { term: 'Address', value: broker.address ?? 'Not learned' },
             { term: 'Reach', value: broker.reachable ? 'Reached' : `Not reached. ${broker.reason ?? ''}` },
             { term: 'Leaders', value: figure(broker.leaders) },
@@ -397,7 +397,7 @@ function ClusterBody({
               </div>
               {graph.summary.omittedEdges > 0 ? (
                 <Notice tone="info" title="Not every pair is drawn">
-                  {`${graph.summary.omittedEdges.toLocaleString()} co-replication pairs are not drawn. The strongest ${GRAPH_EDGE_CAP} are shown. The table lists every broker.`}
+                  {`${graph.summary.omittedEdges.toLocaleString()} co-replication ${graph.summary.omittedEdges === 1 ? 'pair' : 'pairs'} beyond the strongest ${GRAPH_EDGE_CAP} ${graph.summary.omittedEdges === 1 ? 'is' : 'are'} not available on this screen; open Replication, or a topic's partitions, to see a pair.`}
                 </Notice>
               ) : null}
             </Stack>

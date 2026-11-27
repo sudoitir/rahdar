@@ -225,6 +225,9 @@ describe('the cluster', () => {
     expect(figure).toHaveTextContent('Unavailable');
     expect(figure).not.toHaveTextContent('0');
     expect(topics.closest('dl')).toHaveTextContent('a floor, not a total');
+    const under = screen.getAllByText('Under-replicated')[0]?.closest('dl')?.querySelector('dd');
+    expect(under).toHaveTextContent('4');
+    expect(under).not.toHaveTextContent('Unavailable');
   });
 
   it('says why the cluster could not be read', async () => {

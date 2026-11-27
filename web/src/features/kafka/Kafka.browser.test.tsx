@@ -249,7 +249,12 @@ const CASES: Case[] = [
           },
         ],
         controllers: [],
-        quorum: { available: false, reason: 'The cluster runs ZooKeeper.', voters: [], majority: false },
+        quorum: {
+          available: false,
+          reason: 'The controller is kept in ZooKeeper and cannot be read.',
+          voters: [],
+          majority: false,
+        },
         edges: [],
         totals: {
           brokers: 2,
@@ -270,7 +275,7 @@ const CASES: Case[] = [
           topicsWithheld: null,
           topicsOmitted: 0,
         },
-        notes: ['The cluster runs ZooKeeper.'],
+        notes: ['The controller is kept in ZooKeeper and cannot be read.'],
       }),
   },
 ];

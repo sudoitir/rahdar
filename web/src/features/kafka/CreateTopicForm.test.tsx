@@ -10,6 +10,8 @@ const calls = vi.hoisted(() => ({
   preview: [] as TopicCreateBody[],
   create: [] as TopicCreateBody[],
   held: false,
+  brokers: 3 as number | null,
+  brokersReached: 3 as number | null,
 }));
 
 vi.mock('./api.ts', () => ({
@@ -55,17 +57,29 @@ vi.mock('./api.ts', () => ({
     error: null,
     reset: () => undefined,
   }),
-  useKafkaCluster: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useKafkaCluster: () => ({
+    data:
+      calls.brokers == null
+        ? undefined
+        : { totals: { brokers: calls.brokers, brokersReached: calls.brokersReached ?? 0 } },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
-function renderForm(scheme: 'light' | 'dark', permissionReason: string | null = null) {
+function renderForm(
+  scheme: 'light' | 'dark',
+  permissionReason: string | null = null,
+  brokersReached: number | null = 3,
+) {
   document.documentElement.setAttribute('data-mantine-color-scheme', scheme);
   return renderWithProviders(
     <CreateTopicForm
       clusterId="k1"
       opened
       onClose={() => undefined}
-      brokersReached={3}
+      brokersReached={brokersReached}
       permissionReason={permissionReason}
     />,
   );
@@ -84,6 +98,8 @@ describe('creating a topic', () => {
     calls.preview = [];
     calls.create = [];
     calls.held = false;
+    calls.brokers = 3;
+    calls.brokersReached = 3;
   });
 
   it.each(['light', 'dark'] as const)(
@@ -172,7 +188,7 @@ describe('creating a topic', () => {
     ]);
   });
 
-  it('refuses a replication factor above the brokers this connection reached', async () => {
+  it('refuses a replication factor above the brokers in the cluster', async () => {
     const user = userEvent.setup();
     renderForm('light');
     await fill('Name', 'orders');
@@ -180,7 +196,26 @@ describe('creating a topic', () => {
     await fill('Replication factor', '4');
     await user.click(screen.getByRole('button', { name: 'Preview topic' }));
     expect(calls.preview).toEqual([]);
-    expect(screen.getByText(/from 1 to 3/)).toBeInTheDocument();
+    expect(screen.getByText(/from 1 to 3, the brokers in this cluster/)).toBeInTheDocument();
+  });
+
+  it('allows a replication factor up to the brokers the cluster has, not only those reached', async () => {
+    calls.brokers = 3;
+    calls.brokersReached = 1;
+    const user = userEvent.setup();
+    renderForm('light', null, 1);
+    await fill('Name', 'orders');
+    await fill('Partition count', '1');
+    await fill('Replication factor', '3');
+    await user.click(screen.getByRole('button', { name: 'Preview topic' }));
+    expect(calls.preview).toHaveLength(1);
+    expect(screen.queryByText(/from 1 to/)).toBeNull();
+    expect(screen.getByText(/reached 1 broker/)).toBeInTheDocument();
+
+    await fill('Replication factor', '4');
+    await user.click(screen.getByRole('button', { name: 'Preview topic' }));
+    expect(calls.preview).toHaveLength(1);
+    expect(screen.getByText(/from 1 to 3, the brokers in this cluster/)).toBeInTheDocument();
   });
 
   it('does not call a held create a failure to reach the cluster', async () => {
