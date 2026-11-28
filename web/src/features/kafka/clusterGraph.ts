@@ -47,18 +47,18 @@ function place(rack?: string | null, address?: string | null): string | undefine
 }
 
 /**
- * Two lines. The accessible name is kind, label, detail, in that order (nodeName), and DiagramView
- * draws them in that order, so the visible words stay a contiguous run of the name. The address is
- * last in the detail, so ellipsis cuts it before the reach word.
+ * The reach word is its own line. One detail line shares the box with the address, and ellipsis then
+ * cuts "Not reached" before the address. The accessible name is kind, label, detail, in that order
+ * (nodeName), and DiagramView draws them in that order, so the visible words stay a contiguous run.
  */
 function brokerNode(broker: ClusterGraphBroker): DiagramNode {
   const where = place(broker.rack, broker.address);
   const reach = broker.reachable ? null : `Not reached. ${broker.reason ?? 'The cluster gave no reason.'}`;
-  const detail = [reach, where].filter(Boolean).join(' · ');
   return {
     id: brokerNodeId(broker.id),
-    label: [`Broker ${broker.id}`, broker.quorumLeader ? 'quorum leader' : null].filter(Boolean).join(', '),
-    detail: detail || undefined,
+    kind: [`Broker ${broker.id}`, broker.quorumLeader ? 'quorum leader' : null].filter(Boolean).join(', '),
+    label: reach ?? where ?? `Broker ${broker.id}`,
+    detail: reach && where ? where : undefined,
   };
 }
 

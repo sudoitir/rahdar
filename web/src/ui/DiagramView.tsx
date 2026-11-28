@@ -72,7 +72,7 @@ export interface DiagramViewProps {
   onNodeAction?: (nodeId: string, actionId: string) => void;
 }
 
-const CARD = { width: 240, height: 68 };
+const CARD = { width: 320, height: 68 };
 const FIT = { padding: 0.12, maxZoom: 1 };
 
 type Positions = Record<string, { x: number; y: number }>;
@@ -85,7 +85,8 @@ function toElk(nodes: DiagramNode[], edges: DiagramEdge[], direction: string): E
       'elk.algorithm': 'layered',
       'elk.direction': direction,
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '56',
+      // Wide enough that an edge chip sits clear of the boxes instead of under them.
+      'elk.layered.spacing.nodeNodeBetweenLayers': '128',
       'elk.spacing.nodeNode': '32',
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
     },

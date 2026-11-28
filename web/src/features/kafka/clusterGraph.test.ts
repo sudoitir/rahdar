@@ -24,8 +24,8 @@ describe('clusterGraph', () => {
   it('draws a healthy cluster as boxes joined by the pairs that share partitions', () => {
     const graph = clusterGraph(three);
     expect(graph.nodes.map((n) => n.id)).toEqual(['broker:1', 'broker:2', 'broker:3']);
-    expect(graph.nodes[0]).toMatchObject({ label: 'Broker 1, quorum leader', detail: 'a · k1:9092' });
-    expect(graph.nodes[2]).toMatchObject({ label: 'Broker 3', detail: 'k3:9092' });
+    expect(graph.nodes[0]).toMatchObject({ label: 'a · k1:9092', kind: 'Broker 1, quorum leader' });
+    expect(graph.nodes[2]).toMatchObject({ label: 'k3:9092', kind: 'Broker 3' });
     expect(graph.edges.map((e) => e.id)).toEqual(['1-3', '1-2', '2-3']);
     expect(graph.edges[0]).toMatchObject({
       label: '9',
@@ -56,8 +56,9 @@ describe('clusterGraph', () => {
       }),
     );
     expect(graph.nodes[1]).toMatchObject({
-      label: 'Broker 2',
-      detail: 'Not reached. Connection refused. · k2:9092',
+      kind: 'Broker 2',
+      label: 'Not reached. Connection refused.',
+      detail: 'k2:9092',
     });
     expect(graph.nodes[1]?.state).toBeUndefined();
     expect(graph.edges[0]).toMatchObject({
