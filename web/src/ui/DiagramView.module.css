@@ -174,7 +174,8 @@
 .edge,
 .dashed {
   stroke: var(--as-flow-edge);
-  stroke-width: 1.25;
+  /* --edge-weight is a count. Capped well under the 68px box so a thick line stays a line. */
+  stroke-width: clamp(1.25px, calc(var(--edge-weight, 1) * 1px), 16px);
   fill: none;
 }
 

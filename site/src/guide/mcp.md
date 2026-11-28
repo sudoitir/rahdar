@@ -91,6 +91,7 @@ can be run again.
 | Tool | `artemis_config_change` | declare a configuration, or apply it canary-first with hazards acknowledged by id |
 | Tool | `connection_action` | close a connection, channel, consumer or a destination's consumers |
 | Tool | `send_message` | enqueue one message |
+| Tool | `kafka_describe_cluster` | the cluster as the screen shows it: brokers, the quorum, co-replication and the same totals; needs `cluster:read` |
 | Tool | `kafka_list_groups`, `kafka_describe_group` | consumer groups with state, members and lag, and one group's partitions and members |
 | Tool | `kafka_preview_offset_reset`, `kafka_reset_offsets` | what a reset would move, and the reset itself, run against the preview |
 | Tool | `kafka_topic_config`, `kafka_set_topic_config` | a topic's settings and where each comes from, and changing them |
@@ -114,7 +115,7 @@ system gives it. The arguments are named for what the resource is: `subscription
 
 A tool that exists for one broker system carries that system's id as a prefix:
 `artemis_config`, `artemis_config_change`, `artemis_config_diff`,
-`artemis_divert_lifecycle`, the eight `kafka_*` tools, and `setup_review`. It is offered only to a key that can read
+`artemis_divert_lifecycle`, the `kafka_*` tools, and `setup_review`. It is offered only to a key that can read
 a cluster of that system, and a call that names a cluster of another system is a tool
 error that says which system the cluster runs.
 

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
+import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.kafka.admin.KafkaKinds;
 import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.Resource;
@@ -126,7 +127,12 @@ public class KafkaPartitionReads {
     }
 
     private List<Resource> readAll(UUID clusterId, String topic) {
-        ResourceQuery query = ResourceQuery.of(KafkaKinds.PARTITION).project(PROJECTION);
+        return allPartitions(gateway.cluster(clusterId), topic, PROJECTION);
+    }
+
+    /** Every partition page, in the cluster's order. A blank topic is the whole cluster. */
+    static List<Resource> allPartitions(ClusterConnection connection, String topic, Set<String> projection) {
+        ResourceQuery query = ResourceQuery.of(KafkaKinds.PARTITION).project(projection);
         if (topic != null && !topic.isBlank()) {
             query = query.where(Map.of(TOPIC, topic));
         }
@@ -134,8 +140,8 @@ public class KafkaPartitionReads {
         Optional<String> cursor = Optional.empty();
         ResourceQuery start = query;
         do {
-            ResourcePage page = KafkaGroups.read(
-                    gateway.cluster(clusterId), cursor.map(start::continueFrom).orElse(start));
+            ResourcePage page =
+                    KafkaGroups.read(connection, cursor.map(start::continueFrom).orElse(start));
             all.addAll(page.items());
             cursor = page.continueToken();
         } while (cursor.isPresent());

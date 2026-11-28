@@ -410,24 +410,7 @@ public final class KafkaViews {
             @Schema(requiredMode = REQUIRED, description = "False where it had ended already.")
             boolean aborted) {}
 
-    // ---- brokers ------------------------------------------------------------------------------------------------
-
-    public record BrokerRow(
-            @Schema(requiredMode = REQUIRED) String id,
-            @Schema(nullable = true) String rack,
-            @Schema(nullable = true) String address,
-
-            @Schema(requiredMode = REQUIRED, description = "Whether Rahdar reaches it on the address it advertises.")
-            boolean reachable,
-
-            @Schema(nullable = true, description = "Why it is not reachable or not serving.")
-            String reason,
-
-            @Schema(requiredMode = REQUIRED) long leaders,
-            @Schema(requiredMode = REQUIRED) long underReplicated,
-
-            @Schema(requiredMode = REQUIRED, description = "Partitions it replicates that have no leader.")
-            long offline) {}
+    // ---- quorum -------------------------------------------------------------------------------------------------
 
     public record QuorumVoter(
             @Schema(requiredMode = REQUIRED) String id,
@@ -448,10 +431,140 @@ public final class KafkaViews {
             @Schema(requiredMode = REQUIRED, description = "Whether the voters that are caught up are a majority.")
             boolean majority) {}
 
-    public record Brokers(
-            @Schema(requiredMode = REQUIRED, description = "KRaft or ZooKeeper.")
+    // ---- cluster ------------------------------------------------------------------------------------------------
+
+    public record ClusterView(
+            @Schema(requiredMode = REQUIRED, description = "KRaft, ZooKeeper or Unknown.")
             String mode,
 
-            @Schema(requiredMode = REQUIRED) List<BrokerRow> brokers,
-            @Schema(requiredMode = REQUIRED) BrokerQuorum quorum) {}
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "False when the read stopped at the topic cap, or placement was not read.")
+            boolean complete,
+
+            @Schema(nullable = true, description = "Why the read is incomplete.")
+            String reason,
+
+            @Schema(requiredMode = REQUIRED) List<ClusterBroker> brokers,
+            @Schema(requiredMode = REQUIRED) List<ClusterController> controllers,
+            @Schema(requiredMode = REQUIRED) BrokerQuorum quorum,
+            @Schema(requiredMode = REQUIRED) List<CoReplication> edges,
+            @Schema(requiredMode = REQUIRED) ClusterTotals totals,
+            @Schema(requiredMode = REQUIRED) ClusterProblems problems,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "What the cluster cannot show, in words. Never counted as healthy.")
+            List<String> notes) {}
+
+    public record ClusterBroker(
+            @Schema(requiredMode = REQUIRED) String id,
+            @Schema(nullable = true) String rack,
+            @Schema(nullable = true) String address,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "False when Rahdar did not reach it, or the cluster says it is not serving.")
+            boolean reachable,
+
+            @Schema(nullable = true) String reason,
+
+            @Schema(
+                    nullable = true,
+                    description = "Absent when the broker id is not a number. Never zero for an unknown.")
+            Long leaders,
+
+            @Schema(
+                    nullable = true,
+                    description = "Absent when the broker id is not a number. Never zero for an unknown.")
+            Long replicasHeld,
+
+            @Schema(
+                    nullable = true,
+                    description = "Absent when the broker id is not a number. Never zero for an unknown.")
+            Long outOfSyncReplicas,
+
+            @Schema(
+                    nullable = true,
+                    description = "Partitions it replicates that have no leader. Absent when the id is not a number.")
+            Long offlineReplicas,
+
+            @Schema(requiredMode = REQUIRED) boolean quorumLeader) {}
+
+    /** A controller that serves no clients. A broker that also votes stays a broker. */
+    public record ClusterController(
+            @Schema(requiredMode = REQUIRED) String id,
+
+            @Schema(nullable = true, description = "Records behind the quorum leader.")
+            Long lag,
+
+            @Schema(requiredMode = REQUIRED) boolean caughtUp,
+            @Schema(requiredMode = REQUIRED) boolean quorumLeader) {}
+
+    public record CoReplication(
+            @Schema(requiredMode = REQUIRED, description = "The lower broker id.")
+            String a,
+
+            @Schema(requiredMode = REQUIRED, description = "The higher broker id.")
+            String b,
+
+            @Schema(requiredMode = REQUIRED) long sharedPartitions,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Shared partitions where a replica of this pair is out of sync.")
+            long outOfSyncReplicas) {}
+
+    public record ClusterTotals(
+            @Schema(requiredMode = REQUIRED) long brokers,
+            @Schema(requiredMode = REQUIRED) long brokersReached,
+            @Schema(requiredMode = REQUIRED) long controllers,
+
+            @Schema(
+                    nullable = true,
+                    description =
+                            "Absent when placement was not read; present as the floor when the topic cap was reached.")
+            Long topics,
+
+            @Schema(
+                    nullable = true,
+                    description =
+                            "Absent when placement was not read; present as the floor when the topic cap was reached.")
+            Long partitions,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long underReplicated,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long offline,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long preferredLeaderMismatches,
+
+            @Schema(requiredMode = REQUIRED, description = "True when topics and partitions are a floor, not a total.")
+            boolean atLeast) {}
+
+    public record ClusterProblems(
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long offline,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long underReplicated,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long preferredLeaderMismatches,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "At most 20 topic names. Empty when the caller lacks destination:read.")
+            List<String> topics,
+
+            @Schema(nullable = true, description = "Set when the topic names need destination:read.")
+            String topicsWithheld,
+
+            @Schema(
+                    nullable = true,
+                    description =
+                            "Topic names not in the list: past the cap, or all of them when withheld; absent when placement was not read.")
+            Long topicsOmitted) {}
 }

@@ -3,9 +3,7 @@ package io.github.sudoitir.rahdar.system.kafka.web;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
 import io.github.sudoitir.rahdar.system.kafka.KafkaBrokerConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaBrokerConfigs;
-import io.github.sudoitir.rahdar.system.kafka.KafkaBrokers;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.BrokerConfig;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Brokers;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigPreview;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The brokers of a Kafka cluster, under the same {@code /clusters/{id}/kafka/} path as the other Kafka reads. Split
- * from {@link KafkaController} so that class stays within its dependency budget. The document keeps that class's tag,
- * so the broker read stays where clients already find it. Another system's cluster answers this with {@code 404}.
+ * A Kafka broker's settings, under the same {@code /clusters/{id}/kafka/} path as the other Kafka reads. Split from
+ * {@link KafkaController} so that class stays within its dependency budget. The document keeps that class's tag.
+ * Another system's cluster answers this with {@code 404}. The cluster itself is {@code GET /kafka/cluster}.
  */
 @RestController
 @RequestMapping("/clusters/{clusterId}/kafka")
@@ -29,14 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class KafkaBrokerController {
 
-    private final KafkaBrokers brokers;
     private final KafkaBrokerConfigs configs;
     private final KafkaBrokerConfigChanges configChanges;
-
-    @GetMapping("/brokers")
-    public Brokers brokers(@PathVariable UUID clusterId) {
-        return brokers.read(clusterId);
-    }
 
     /** A broker's settings, or {@code default} for the cluster-wide default. */
     @GetMapping("/brokers/{broker}/config")

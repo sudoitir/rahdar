@@ -64,6 +64,7 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `artemis_config_change` | 声明一份配置，或以金丝雀优先、按 id 确认危害的方式应用它 |
 | Tool | `connection_action` | 关闭连接、通道、消费者或某个目的地的全部消费者 |
 | Tool | `send_message` | 投递一条消息 |
+| Tool | `kafka_describe_cluster` | 与页面相同的集群读：broker、控制器仲裁、共同持有副本的边，以及相同的合计；需要 `cluster:read` |
 | Tool | `kafka_list_groups`、`kafka_describe_group` | 消费组及其状态、成员与滞后；单个消费组的分区与成员 |
 | Tool | `kafka_preview_offset_reset`、`kafka_reset_offsets` | 一次重置会移动什么，以及按预览执行的重置本身 |
 | Tool | `kafka_topic_config`、`kafka_set_topic_config` | 主题的各项设置及其来源，以及修改它们 |
@@ -80,7 +81,7 @@ curl -s https://rahdar.example.com/mcp \
 
 工具用资源的**规范 id** 指代资源，例如 `artemis.queue/orders`，也就是 `list_resources` 在每一行返回的 `id`，连同系统给它的 `kind` 与 `kindLabel`。参数按资源的角色命名：`subscription`、`destination`、`resource`（生命周期的目标）和 `target`。`list_resources` 接受要列出的 `role`——`destination`、`subscription`、`route`、`connection`、`channel`、`consumer` 或 `producer`——以及可选的某个 `kind`。
 
-只为某一个 Broker 系统存在的工具以该系统的 id 为前缀：`artemis_config`、`artemis_config_change`、`artemis_config_diff`、`artemis_divert_lifecycle`、八个 `kafka_*` 工具，以及 `setup_review`。只有能读取该系统某个集群的密钥才会被提供这些工具；对其他系统的集群调用，会得到一个说明该集群运行哪个系统的工具错误。
+只为某一个 Broker 系统存在的工具以该系统的 id 为前缀：`artemis_config`、`artemis_config_change`、`artemis_config_diff`、`artemis_divert_lifecycle`、`kafka_*` 工具，以及 `setup_review`。只有能读取该系统某个集群的密钥才会被提供这些工具；对其他系统的集群调用，会得到一个说明该集群运行哪个系统的工具错误。
 
 ## 安全契约
 

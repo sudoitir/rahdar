@@ -3588,14 +3588,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/clusters/{clusterId}/kafka/brokers": {
+    "/api/v1/clusters/{clusterId}/kafka/cluster": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["brokers"];
+        get: operations["cluster"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9714,29 +9714,134 @@ export interface components {
             /** @description Whether the voters that are caught up are a majority. */
             majority: boolean;
         };
-        BrokerRow: {
+        ClusterBroker: {
             id: string;
             rack?: string | null;
             address?: string | null;
-            /** @description Whether Rahdar reaches it on the address it advertises. */
+            /** @description False when Rahdar did not reach it, or the cluster says it is not serving. */
             reachable: boolean;
-            /** @description Why it is not reachable or not serving. */
             reason?: string | null;
-            /** Format: int64 */
-            leaders: number;
-            /** Format: int64 */
-            underReplicated: number;
             /**
              * Format: int64
-             * @description Partitions it replicates that have no leader.
+             * @description Absent when the broker id is not a number. Never zero for an unknown.
              */
-            offline: number;
+            leaders?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when the broker id is not a number. Never zero for an unknown.
+             */
+            replicasHeld?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when the broker id is not a number. Never zero for an unknown.
+             */
+            outOfSyncReplicas?: number | null;
+            /**
+             * Format: int64
+             * @description Partitions it replicates that have no leader. Absent when the id is not a number.
+             */
+            offlineReplicas?: number | null;
+            quorumLeader: boolean;
         };
-        Brokers: {
-            /** @description KRaft or ZooKeeper. */
+        ClusterController: {
+            id: string;
+            /**
+             * Format: int64
+             * @description Records behind the quorum leader.
+             */
+            lag?: number | null;
+            caughtUp: boolean;
+            quorumLeader: boolean;
+        };
+        ClusterProblems: {
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            offline?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            underReplicated?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            preferredLeaderMismatches?: number | null;
+            /** @description At most 20 topic names. Empty when the caller lacks destination:read. */
+            topics: string[];
+            /** @description Set when the topic names need destination:read. */
+            topicsWithheld?: string | null;
+            /**
+             * Format: int64
+             * @description Topic names not in the list: past the cap, or all of them when withheld; absent when placement was not read.
+             */
+            topicsOmitted?: number | null;
+        };
+        ClusterTotals: {
+            /** Format: int64 */
+            brokers: number;
+            /** Format: int64 */
+            brokersReached: number;
+            /** Format: int64 */
+            controllers: number;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read; present as the floor when the topic cap was reached.
+             */
+            topics?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read; present as the floor when the topic cap was reached.
+             */
+            partitions?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            underReplicated?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            offline?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            preferredLeaderMismatches?: number | null;
+            /** @description True when topics and partitions are a floor, not a total. */
+            atLeast: boolean;
+        };
+        ClusterView: {
+            /** @description KRaft, ZooKeeper or Unknown. */
             mode: string;
-            brokers: components["schemas"]["BrokerRow"][];
+            /** @description False when the read stopped at the topic cap, or placement was not read. */
+            complete: boolean;
+            /** @description Why the read is incomplete. */
+            reason?: string | null;
+            brokers: components["schemas"]["ClusterBroker"][];
+            controllers: components["schemas"]["ClusterController"][];
             quorum: components["schemas"]["BrokerQuorum"];
+            edges: components["schemas"]["CoReplication"][];
+            totals: components["schemas"]["ClusterTotals"];
+            problems: components["schemas"]["ClusterProblems"];
+            /** @description What the cluster cannot show, in words. Never counted as healthy. */
+            notes: string[];
+        };
+        CoReplication: {
+            /** @description The lower broker id. */
+            a: string;
+            /** @description The higher broker id. */
+            b: string;
+            /** Format: int64 */
+            sharedPartitions: number;
+            /**
+             * Format: int64
+             * @description Shared partitions where a replica of this pair is out of sync.
+             */
+            outOfSyncReplicas: number;
         };
         QuorumVoter: {
             id: string;
@@ -28416,7 +28521,7 @@ export interface operations {
             };
         };
     };
-    brokers: {
+    cluster: {
         parameters: {
             query?: never;
             header?: never;
@@ -28433,7 +28538,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Brokers"];
+                    "*/*": components["schemas"]["ClusterView"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */

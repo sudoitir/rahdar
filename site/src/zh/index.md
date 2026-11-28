@@ -39,7 +39,7 @@ features:
     details: 主备拓扑，HA 角色在每个周期从每个节点轮询得到，绝不读取配置。所有节点的所有队列在一张表里，另有 Flow、对消息的 SQL 查询与 Broker 配置声明。
     link: /zh/guide/sql-console
   - title: 与人共用一套权限的 MCP 服务器
-    details: 助手用不超过其所有者权限的 API 密钥读取你真实的集群。八个 kafka_* 工具的变更只针对它看过的预览执行，并在闸门开启时等待人来批准。
+    details: 助手用不超过其所有者权限的 API 密钥读取你真实的集群。kafka_* 工具的变更只针对它看过的预览执行，并在闸门开启时等待人来批准。
     link: /zh/guide/mcp
 ---
 

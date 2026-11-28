@@ -29,7 +29,7 @@ class KafkaMcpReplicationTest {
     private final KafkaPartitionReads reads = mock(KafkaPartitionReads.class);
     private final KafkaReplication replication = mock(KafkaReplication.class);
     private final KafkaMcpReadTools tools =
-            new KafkaMcpReadTools(null, null, null, null, null, null, reads, replication);
+            new KafkaMcpReadTools(null, null, null, null, null, null, reads, replication, null);
 
     @Test
     void aSuggestionDoesNotCallReassign() {

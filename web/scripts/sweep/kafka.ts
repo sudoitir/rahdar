@@ -70,6 +70,25 @@ const LONG_GROUP = `qa.${Array.from({ length: 8 }, (_, i) => `consumer-group-seg
 /** Waits for what a stub or an action changed to show. */
 export const settle = (page: Page) => page.waitForTimeout(500);
 
+/**
+ * A broker box the cluster-view stubs share. The defaults are a six-partition, single-replica
+ * cluster split across three brokers: two leaders and two replicas each. A scene that changes the
+ * partition count or the replication factor overrides them so the counters stay possible.
+ */
+function sweepBroker(id: string, over: Record<string, unknown> = {}) {
+  return {
+    id,
+    address: `kafka-${id}:9092`,
+    reachable: true,
+    leaders: 2,
+    replicasHeld: 2,
+    outOfSyncReplicas: 0,
+    offlineReplicas: 0,
+    quorumLeader: false,
+    ...over,
+  };
+}
+
 /** Answers GETs of a path with a body, then reloads so the page asks again. */
 export async function stubGet(page: Page, path: RegExp, body: unknown) {
   await page.route(
@@ -660,15 +679,44 @@ export const KAFKA_ROUTES: RouteSpec[] = [
   },
   {
     area: 'kafka',
-    id: 'brokers',
-    path: kafka('kafka/brokers'),
+    id: 'cluster',
+    path: kafka('kafka/cluster'),
     data: [
       {
-        path: kafka('kafka/brokers'),
+        path: kafka('kafka/cluster'),
         empty: {
-          mode: 'KRaft',
+          mode: 'Unknown',
+          complete: true,
+          reason: null,
           brokers: [],
-          quorum: { available: false, reason: 'No broker answered.', voters: [], majority: false },
+          controllers: [],
+          quorum: {
+            available: false,
+            reason: 'The cluster mode could not be read, so the quorum is not counted as healthy.',
+            voters: [],
+            majority: false,
+          },
+          edges: [],
+          totals: {
+            brokers: 0,
+            brokersReached: 0,
+            controllers: 0,
+            topics: 0,
+            partitions: 0,
+            underReplicated: 0,
+            offline: 0,
+            preferredLeaderMismatches: 0,
+            atLeast: false,
+          },
+          problems: {
+            offline: 0,
+            underReplicated: 0,
+            preferredLeaderMismatches: 0,
+            topics: [],
+            topicsWithheld: null,
+            topicsOmitted: 0,
+          },
+          notes: ['The cluster mode could not be read, so the quorum is not counted as healthy.'],
         },
       },
     ],
@@ -677,38 +725,91 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       {
         id: 'zookeeper-stub',
         act: (page) =>
-          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/brokers$/, {
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
             mode: 'ZooKeeper',
+            complete: true,
+            reason: null,
             brokers: [
-              { id: '1', address: 'kafka-1:9092', reachable: true, leaders: 12, underReplicated: 0, offline: 0 },
-              { id: '2', address: 'kafka-2:9092', reachable: true, leaders: 11, underReplicated: 0, offline: 0 },
+              {
+                id: '1',
+                address: 'kafka-1:9092',
+                reachable: true,
+                leaders: 6,
+                replicasHeld: 9,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
+              },
+              {
+                id: '2',
+                address: 'kafka-2:9092',
+                reachable: true,
+                leaders: 6,
+                replicasHeld: 9,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
+              },
             ],
-            quorum: { available: false, reason: 'The cluster runs ZooKeeper.', voters: [], majority: false },
+            controllers: [],
+            quorum: {
+              available: false,
+              reason: 'The controller is kept in ZooKeeper and cannot be read.',
+              voters: [],
+              majority: false,
+            },
+            edges: [{ a: '1', b: '2', sharedPartitions: 6, outOfSyncReplicas: 0 }],
+            totals: {
+              brokers: 2,
+              brokersReached: 2,
+              controllers: 0,
+              topics: 4,
+              partitions: 12,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: ['The controller is kept in ZooKeeper and cannot be read.'],
           }),
       },
       {
         id: 'broker-down-stub',
         act: (page) =>
-          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/brokers$/, {
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
             mode: 'KRaft',
+            complete: true,
+            reason: null,
             brokers: [
               {
                 id: '1',
                 rack: 'a',
                 address: 'kafka-1:9092',
                 reachable: true,
-                leaders: 12,
-                underReplicated: 4,
-                offline: 0,
+                leaders: 7,
+                replicasHeld: 7,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: true,
               },
               {
                 id: '2',
                 rack: 'b',
                 address: 'kafka-2:9092',
                 reachable: true,
-                leaders: 11,
-                underReplicated: 4,
-                offline: 0,
+                leaders: 1,
+                replicasHeld: 5,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
               },
               {
                 id: '3',
@@ -717,10 +818,13 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 reachable: false,
                 reason: 'Connection refused.',
                 leaders: 0,
-                underReplicated: 0,
-                offline: 3,
+                replicasHeld: 5,
+                outOfSyncReplicas: 5,
+                offlineReplicas: 1,
+                quorumLeader: false,
               },
             ],
+            controllers: [],
             quorum: {
               available: true,
               leader: '1',
@@ -731,19 +835,73 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 { id: '3', lag: 4800, caughtUp: false },
               ],
             },
+            edges: [
+              { a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 0 },
+              { a: '1', b: '3', sharedPartitions: 3, outOfSyncReplicas: 3 },
+              { a: '2', b: '3', sharedPartitions: 1, outOfSyncReplicas: 1 },
+            ],
+            totals: {
+              brokers: 3,
+              brokersReached: 2,
+              controllers: 0,
+              topics: 2,
+              partitions: 9,
+              underReplicated: 4,
+              offline: 1,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 1,
+              underReplicated: 4,
+              preferredLeaderMismatches: 0,
+              topics: ['orders'],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
           }),
       },
       {
-        // Two of the three voters are behind: the caught-up voters are not a majority, the critical state.
         id: 'no-majority-stub',
         act: (page) =>
-          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/brokers$/, {
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
             mode: 'KRaft',
+            complete: true,
+            reason: null,
             brokers: [
-              { id: '1', address: 'kafka-1:9092', reachable: true, leaders: 20, underReplicated: 0, offline: 0 },
-              { id: '2', address: 'kafka-2:9092', reachable: true, leaders: 20, underReplicated: 0, offline: 0 },
-              { id: '3', address: 'kafka-3:9092', reachable: true, leaders: 20, underReplicated: 0, offline: 0 },
+              {
+                id: '1',
+                address: 'kafka-1:9092',
+                reachable: true,
+                leaders: 20,
+                replicasHeld: 20,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: true,
+              },
+              {
+                id: '2',
+                address: 'kafka-2:9092',
+                reachable: true,
+                leaders: 20,
+                replicasHeld: 20,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
+              },
+              {
+                id: '3',
+                address: 'kafka-3:9092',
+                reachable: true,
+                leaders: 20,
+                replicasHeld: 20,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
+              },
             ],
+            controllers: [],
             quorum: {
               available: true,
               leader: '1',
@@ -754,6 +912,400 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 { id: '3', caughtUp: false },
               ],
             },
+            edges: [],
+            totals: {
+              brokers: 3,
+              brokersReached: 3,
+              controllers: 0,
+              topics: 2,
+              partitions: 60,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
+          }),
+      },
+      {
+        id: 'pre-4-stub',
+        act: (page) =>
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: true,
+            reason: null,
+            brokers: [
+              {
+                id: '1',
+                address: 'kafka-1:9092',
+                reachable: true,
+                leaders: 8,
+                replicasHeld: 8,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: true,
+              },
+            ],
+            controllers: [],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: true,
+              voters: [{ id: '1', lag: 0, caughtUp: true }],
+            },
+            edges: [],
+            totals: {
+              brokers: 1,
+              brokersReached: 1,
+              controllers: 0,
+              topics: 1,
+              partitions: 8,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [
+              'Kafka before 4.0 does not list fenced brokers, so a fenced broker is missing from the nodes instead of shown as fenced.',
+            ],
+          }),
+      },
+      {
+        id: 'dedicated-controller-stub',
+        act: (page) =>
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: true,
+            reason: null,
+            brokers: [
+              {
+                id: '1',
+                address: 'kafka-1:9092',
+                reachable: true,
+                leaders: 3,
+                replicasHeld: 6,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
+              },
+              {
+                id: '2',
+                address: 'kafka-2:9092',
+                reachable: true,
+                leaders: 3,
+                replicasHeld: 6,
+                outOfSyncReplicas: 0,
+                offlineReplicas: 0,
+                quorumLeader: false,
+              },
+            ],
+            controllers: [
+              { id: '100', lag: 0, caughtUp: true, quorumLeader: true },
+              { id: '101', lag: 0, caughtUp: true, quorumLeader: false },
+              { id: '102', lag: 1, caughtUp: true, quorumLeader: false },
+            ],
+            quorum: {
+              available: true,
+              leader: '100',
+              majority: true,
+              voters: [
+                { id: '100', lag: 0, caughtUp: true },
+                { id: '101', lag: 0, caughtUp: true },
+                { id: '102', lag: 1, caughtUp: true },
+              ],
+            },
+            edges: [{ a: '1', b: '2', sharedPartitions: 6, outOfSyncReplicas: 0 }],
+            totals: {
+              brokers: 2,
+              brokersReached: 2,
+              controllers: 3,
+              topics: 1,
+              partitions: 6,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
+          }),
+      },
+      {
+        id: 'healthy-stub',
+        act: (page) =>
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: true,
+            reason: null,
+            brokers: [
+              sweepBroker('1', { rack: 'a', quorumLeader: true, leaders: 6, replicasHeld: 12 }),
+              sweepBroker('2', { rack: 'b', leaders: 6, replicasHeld: 12 }),
+              sweepBroker('3', { rack: 'c', leaders: 6, replicasHeld: 12 }),
+            ],
+            controllers: [],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: true,
+              voters: [
+                { id: '1', lag: 0, caughtUp: true },
+                { id: '2', lag: 0, caughtUp: true },
+                { id: '3', lag: 0, caughtUp: true },
+              ],
+            },
+            edges: [
+              { a: '1', b: '2', sharedPartitions: 6, outOfSyncReplicas: 0 },
+              { a: '1', b: '3', sharedPartitions: 6, outOfSyncReplicas: 0 },
+              { a: '2', b: '3', sharedPartitions: 6, outOfSyncReplicas: 0 },
+            ],
+            totals: {
+              brokers: 3,
+              brokersReached: 3,
+              controllers: 0,
+              topics: 4,
+              partitions: 18,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
+          }),
+      },
+      {
+        id: 'table',
+        act: async (page) => {
+          await stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: true,
+            reason: null,
+            brokers: [sweepBroker('1', { quorumLeader: true }), sweepBroker('2'), sweepBroker('3')],
+            controllers: [],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: true,
+              voters: [{ id: '1', lag: 0, caughtUp: true }],
+            },
+            edges: [],
+            totals: {
+              brokers: 3,
+              brokersReached: 3,
+              controllers: 0,
+              topics: 1,
+              partitions: 6,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
+          });
+          // The radio input is drawn at zero size under its label, so a click on it never lands.
+          await page.getByText('Table', { exact: true }).click();
+          await settle(page);
+        },
+      },
+      {
+        id: 'chosen-broker',
+        act: async (page) => {
+          await stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: true,
+            reason: null,
+            brokers: [
+              sweepBroker('1', { rack: 'a', quorumLeader: true, leaders: 3, replicasHeld: 6 }),
+              sweepBroker('2', { rack: 'b', leaders: 3, replicasHeld: 6 }),
+            ],
+            controllers: [],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: true,
+              voters: [{ id: '1', lag: 0, caughtUp: true }],
+            },
+            edges: [{ a: '1', b: '2', sharedPartitions: 6, outOfSyncReplicas: 0 }],
+            totals: {
+              brokers: 2,
+              brokersReached: 2,
+              controllers: 0,
+              topics: 1,
+              partitions: 6,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
+          });
+          await page.getByRole('button', { name: /^Broker 1/ }).click();
+          await settle(page);
+        },
+      },
+      {
+        id: 'capped-pairs-stub',
+        act: (page) => {
+          const brokers = Array.from({ length: 21 }, (_, i) =>
+            sweepBroker(String(i + 1), {
+              quorumLeader: i === 0,
+              leaders: i === 0 ? 20 : 19,
+              replicasHeld: 400,
+            }),
+          );
+          const edges = [];
+          for (let i = 0; i < brokers.length; i++) {
+            for (let j = i + 1; j < brokers.length; j++) {
+              edges.push({
+                a: brokers[i].id,
+                b: brokers[j].id,
+                sharedPartitions: 400,
+                outOfSyncReplicas: 0,
+              });
+            }
+          }
+          return stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: true,
+            reason: null,
+            brokers,
+            controllers: [],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: true,
+              voters: [{ id: '1', lag: 0, caughtUp: true }],
+            },
+            edges,
+            totals: {
+              brokers: 21,
+              brokersReached: 21,
+              controllers: 0,
+              topics: 40,
+              partitions: 400,
+              underReplicated: 0,
+              offline: 0,
+              preferredLeaderMismatches: 0,
+              atLeast: false,
+            },
+            problems: {
+              offline: 0,
+              underReplicated: 0,
+              preferredLeaderMismatches: 0,
+              topics: [],
+              topicsWithheld: null,
+              topicsOmitted: 0,
+            },
+            notes: [],
+          });
+        },
+      },
+      {
+        id: 'incomplete-stub',
+        act: (page) =>
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
+            mode: 'KRaft',
+            complete: false,
+            reason: 'The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.',
+            brokers: [
+              sweepBroker('1', {
+                quorumLeader: true,
+                leaders: 667,
+                replicasHeld: 2000,
+                outOfSyncReplicas: 3,
+                offlineReplicas: 1,
+              }),
+              sweepBroker('2', {
+                leaders: 667,
+                replicasHeld: 2000,
+                outOfSyncReplicas: 2,
+                offlineReplicas: 1,
+              }),
+              sweepBroker('3', {
+                leaders: 665,
+                replicasHeld: 2000,
+                outOfSyncReplicas: 2,
+                offlineReplicas: 1,
+              }),
+            ],
+            controllers: [],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: true,
+              voters: [{ id: '1', lag: 0, caughtUp: true }],
+            },
+            edges: [
+              { a: '1', b: '2', sharedPartitions: 2000, outOfSyncReplicas: 4 },
+              { a: '1', b: '3', sharedPartitions: 2000, outOfSyncReplicas: 4 },
+              { a: '2', b: '3', sharedPartitions: 2000, outOfSyncReplicas: 3 },
+            ],
+            totals: {
+              brokers: 3,
+              brokersReached: 3,
+              controllers: 0,
+              topics: 2000,
+              partitions: 2000,
+              underReplicated: 4,
+              offline: 1,
+              preferredLeaderMismatches: 2,
+              atLeast: true,
+            },
+            problems: {
+              offline: 1,
+              underReplicated: 4,
+              preferredLeaderMismatches: 2,
+              topics: ['orders'],
+              topicsWithheld: null,
+              topicsOmitted: 14,
+            },
+            notes: ['The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.'],
           }),
       },
     ],

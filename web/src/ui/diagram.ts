@@ -21,8 +21,15 @@ export interface DiagramEdge {
   source: string;
   target: string;
   label?: string;
+  /**
+   * Read out instead of `label` when the chip must be shorter. The chip's words are a contiguous
+   * run of this, so what is seen is what is heard.
+   */
+  spoken?: string;
   /** Drawn dashed: a secondary path. Its meaning belongs in its label. */
   dashed?: boolean;
+  /** Line thickness, as a CSS custom property. It does not move a box. */
+  weight?: number;
   /** Something can be inserted on this arrow: it offers the diagram's `insertChoices`. */
   insertable?: boolean;
 }
@@ -56,12 +63,11 @@ export function layoutSignature(nodes: DiagramNode[], edges: DiagramEdge[], dire
  * screen reader otherwise never meets), and any problem.
  */
 export function nodeName(n: DiagramNode, via: string[] = []): string {
-  let name = [n.kind, n.label, n.detail].filter(Boolean).join(', ');
+  // The same words, in the same order, as the box draws them: axe requires the visible text to be
+  // a contiguous run of the accessible name. The state word sits with the kind, above the label.
+  const problem = n.state === 'error' ? 'Invalid' : n.state === 'warning' ? 'Warning' : null;
+  let name = [n.kind, problem, n.label, n.detail].filter(Boolean).join(' ');
   if (via.length) name += `. Via ${via.join('; ')}`;
-  if (n.state) {
-    const problem = n.state === 'error' ? 'Invalid' : 'Warning';
-    const why = n.reason ? `: ${n.reason}` : '';
-    name += `. ${problem}${why}`;
-  }
+  if (n.reason) name += `. ${n.reason}`;
   return name;
 }

@@ -136,7 +136,7 @@ describe('ClusterViewNav', () => {
     );
     renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
 
-    await screen.findByRole('link', { name: 'Brokers' });
+    await screen.findByRole('link', { name: 'Cluster' });
     // A Kafka cluster is reached by bootstrap servers: no Artemis-shaped view is listed for it.
     for (const name of ['Topology', 'Routes', 'Requests', 'Dead letters', 'Connections']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
@@ -187,7 +187,7 @@ describe('ClusterViewNav', () => {
       'Setup review',
       'Consumer groups',
       'ACLs',
-      'Brokers',
+      'Cluster',
     ]) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }

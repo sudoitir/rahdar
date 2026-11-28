@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
@@ -71,7 +72,7 @@ export interface DiagramViewProps {
   onNodeAction?: (nodeId: string, actionId: string) => void;
 }
 
-const CARD = { width: 240, height: 68 };
+const CARD = { width: 320, height: 68 };
 const FIT = { padding: 0.12, maxZoom: 1 };
 
 type Positions = Record<string, { x: number; y: number }>;
@@ -84,7 +85,8 @@ function toElk(nodes: DiagramNode[], edges: DiagramEdge[], direction: string): E
       'elk.algorithm': 'layered',
       'elk.direction': direction,
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '56',
+      // Wide enough that an edge chip sits clear of the boxes instead of under them.
+      'elk.layered.spacing.nodeNodeBetweenLayers': '128',
       'elk.spacing.nodeNode': '32',
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
     },
@@ -167,6 +169,7 @@ function NodeKind({ node }: Readonly<{ node: DiagramNode }>) {
   return (
     <span className={classes.kind}>
       {node.kind}
+      {node.kind && node.state ? ' ' : null}
       {node.state ? <span className={classes.state}>{STATE_WORD[node.state]}</span> : null}
     </span>
   );
@@ -226,9 +229,13 @@ function CardButton({
       onContextMenu={onContextMenu}
       onKeyDown={onKeyDown}
     >
-      <NodeKind node={n} />
-      <span className={classes.label}>{n.label}</span>
-      {n.detail ? <span className={classes.detail}>{n.detail}</span> : null}
+      <NodeKind node={n} /> <span className={classes.label}>{n.label}</span>
+      {n.detail ? (
+        <>
+          {' '}
+          <span className={classes.detail}>{n.detail}</span>
+        </>
+      ) : null}
     </button>
   );
 }
@@ -274,11 +281,12 @@ const Card = memo(function Card({ id, data }: NodeProps<Node<CardData>>) {
   );
 });
 
-type LineData = { dashed?: boolean; insert?: string };
+type LineData = { dashed?: boolean; insert?: string; weight?: number };
 
 /**
- * A line with its label as a chip. The label is also in the target's accessible name, so the chip is
- * hidden from it. An insertable line carries a "+" beside the chip, named after the boxes it joins.
+ * A line with its label as a chip. That label, or its longer spoken form, is in the target's
+ * accessible name, so the chip is hidden from it. An insertable line carries a "+" beside the chip,
+ * named after the boxes it joins.
  */
 const Line = memo(function Line({
   id,
@@ -312,6 +320,7 @@ const Line = memo(function Line({
         className={d.dashed ? classes.dashed : classes.edge}
         markerEnd={markerEnd}
         interactionWidth={0}
+        style={d.weight == null ? undefined : ({ '--edge-weight': d.weight } as CSSProperties)}
       />
       {label || insert ? (
         <EdgeLabelRenderer>
@@ -508,7 +517,7 @@ export function DiagramView({
           node: n,
           name: nodeName(
             n,
-            edges.filter((e) => e.target === n.id && e.label).map((e) => e.label as string),
+            edges.filter((e) => e.target === n.id && (e.spoken ?? e.label)).map((e) => (e.spoken ?? e.label) as string),
           ),
           selected: n.id === selectedId,
           vertical,
@@ -523,7 +532,11 @@ export function DiagramView({
       target: e.target,
       type: 'line',
       label: e.label,
-      data: { dashed: e.dashed, insert: inserting && e.insertable ? insertName(e, nodes) : undefined },
+      data: {
+        dashed: e.dashed,
+        weight: e.weight,
+        insert: inserting && e.insertable ? insertName(e, nodes) : undefined,
+      },
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
       focusable: false,
     }));

@@ -32,6 +32,6 @@ describe('ClusterLanding', () => {
   it("opens a Kafka cluster on a view its system has, never the topology's management URLs", async () => {
     cluster(KAFKA_SYSTEM, KAFKA_KINDS);
     renderWithProviders(<ClusterLanding />);
-    expect(await screen.findByText('goes to /clusters/c1/kafka/brokers')).toBeInTheDocument();
+    expect(await screen.findByText('goes to /clusters/c1/kafka/cluster')).toBeInTheDocument();
   });
 });

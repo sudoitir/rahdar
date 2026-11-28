@@ -1,0 +1,63 @@
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.stats > * {
+  flex: 1 1 9rem;
+}
+
+.body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-lg);
+  min-inline-size: 0;
+}
+
+.main {
+  flex: 1 1 36rem;
+  min-inline-size: 0;
+}
+
+.aside {
+  flex: 0 1 22rem;
+  min-inline-size: min(100%, 17.5rem);
+}
+
+.frame {
+  block-size: clamp(16rem, 36vh, 22rem);
+}
+
+/* The graph's place while it loads: the same box the diagram will fill, not a spinner on the page. */
+.placeholder {
+  block-size: clamp(16rem, 36vh, 22rem);
+  border: 1px solid var(--as-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--as-canvas-sunken);
+  overflow: hidden;
+}
+
+.atLeast {
+  color: var(--as-text-dimmed);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 400;
+}
+
+.choose {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.topics {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}

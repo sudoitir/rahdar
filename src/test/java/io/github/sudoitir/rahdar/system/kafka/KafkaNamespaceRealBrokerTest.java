@@ -50,7 +50,7 @@ import org.testcontainers.kafka.KafkaContainer;
 /**
  * The Kafka namespace against a real broker (ADR-0216): a group that lags, an offset reset that is previewed, refused
  * while the group has members or the preview is stale, and run; topic settings with their source and the broker's
- * validation; ACLs on a cluster with no authorizer; transactions; and the brokers with their quorum.
+ * validation; ACLs on a cluster with no authorizer; transactions; and the cluster view with its totals and quorum.
  */
 @ExtendWith(AdminAuthenticationExtension.class)
 class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
@@ -325,9 +325,13 @@ class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
         mvc.perform(get("/api/v1/clusters/{c}/kafka/transactions", cluster))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray());
-        mvc.perform(get("/api/v1/clusters/{c}/kafka/brokers", cluster))
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/cluster", cluster))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("KRaft"))
+                .andExpect(jsonPath("$.complete").value(true))
+                .andExpect(jsonPath("$.totals.brokers").value(1))
+                .andExpect(jsonPath("$.totals.brokersReached").value(1))
+                .andExpect(jsonPath("$.totals.atLeast").value(false))
                 .andExpect(jsonPath("$.brokers[0].reachable").value(true))
                 .andExpect(jsonPath("$.brokers[0].leaders").isNumber())
                 .andExpect(jsonPath("$.quorum.available").value(true))

@@ -80,12 +80,45 @@ Below that list, **Hanging transactions** looks only when you ask, and only for 
 coordinator does not know. No timeout ends that one, so it holds back every consumer that reads committed
 records. The page header says which of the two a sentence is about.
 
-## Brokers and the quorum
+## The cluster view
 
-**Observe → Brokers** lists each broker with its address, rack, whether Rahdar reached it, the partitions it
-leads, and its under-replicated and offline partitions. In KRaft mode the **controller quorum** shows the
-leader, the voters, their lag and the majority. In ZooKeeper mode there is no quorum to read: the page says it
-is unknown, and the cluster's health states that instead of counting it as healthy.
+**Observe → Cluster** draws one Kafka cluster as a graph and states the same facts in words. One box is a
+broker that serves clients. One box is a controller that serves none. An edge joins two brokers that hold
+replicas of the same partition. Its label is how many partitions they share, its thickness that number, and it
+is dashed when at least one of those shared replicas is out of sync. The quorum leader is named in words, not
+by colour alone. Above 200 pairs the strongest 200 are drawn, and the page says how many pairs the graph does
+not show. The table lists every broker either way. **Graph** and **Table** live in the address.
+
+The same read states the brokers reached of the brokers known, the controllers, the topics, the partitions,
+the partitions that are under-replicated, the partitions with no leader, the partitions not led by their
+preferred leader, and whether the controller quorum has a majority. Choose a broker to see its rack, its
+address, whether the cluster reached it or why not, the partitions it leads, the replicas it holds and the
+replicas out of sync, and a link to that broker's configuration. A partition that needs attention links to
+**Observe → Replication**. Nothing on this screen writes: there is no action and no menu.
+
+A figure the cluster does not know is **Unavailable**, with the reason, and never 0.
+
+**ZooKeeper.** The brokers and their edges are drawn. The quorum section stays on the page and says the
+controller is kept in ZooKeeper and cannot be read. It is not counted as healthy.
+
+**KRaft before 4.0.** The quorum is shown with its leader and voters. The page states that a fenced broker is
+not listed before Kafka 4.0, so a broker that is absent is not read as healthy.
+
+**Dedicated controllers.** A controller that serves no clients is drawn as its own box. It is not counted
+among the brokers, and it has no co-replication edge.
+
+**More topics than one read describes.** The driver describes at most 2,000 topics at once. At 2,000 or more,
+the topics and the partitions are stated as **at least** their figures, and so are the counts of the partitions
+that need attention. The page says the read is incomplete and why. Names of topics that need attention are
+listed up to 20, and the page says how many names were not listed.
+
+Reading the cluster needs `cluster:read`. The counts of partitions that need attention come with that
+permission. Their topic names also need `destination:read`. Without it the names are withheld, a note says so,
+and the counts stay.
+
+`GET /clusters/{id}/kafka/brokers` is gone. The same facts are `GET /clusters/{id}/kafka/cluster`, and
+`kafka_describe_cluster` for an assistant. A broker's configuration stays at
+`/clusters/{id}/kafka/brokers/{broker}/config`.
 
 ## Partitions and replication
 

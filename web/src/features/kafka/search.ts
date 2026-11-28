@@ -51,3 +51,18 @@ export function validateReplicationSearch(raw: Record<string, unknown>): Replica
   if (typeof raw.topic === 'string' && raw.topic) out.topic = raw.topic;
   return out;
 }
+
+export interface ClusterSearch {
+  view?: 'table';
+  broker?: string;
+}
+
+/** Graph is the default, so only the table is written into the address. */
+export function validateClusterSearch(raw: Record<string, unknown>): ClusterSearch {
+  const out: ClusterSearch = {};
+  if (raw.view === 'table') out.view = 'table';
+  // A numeric id is parsed as a number before it arrives here. It is still the broker's id.
+  const broker = typeof raw.broker === 'number' ? String(raw.broker) : raw.broker;
+  if (typeof broker === 'string' && broker) out.broker = broker;
+  return out;
+}

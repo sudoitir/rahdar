@@ -29643,10 +29643,10 @@
         }
       }
     },
-    "/api/v1/clusters/{clusterId}/kafka/brokers" : {
+    "/api/v1/clusters/{clusterId}/kafka/cluster" : {
       "get" : {
         "tags" : [ "kafka-controller" ],
-        "operationId" : "brokers",
+        "operationId" : "cluster",
         "parameters" : [ {
           "name" : "clusterId",
           "in" : "path",
@@ -29662,7 +29662,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Brokers"
+                  "$ref" : "#/components/schemas/ClusterView"
                 }
               }
             }
@@ -49036,7 +49036,7 @@
         },
         "required" : [ "available", "majority", "voters" ]
       },
-      "BrokerRow" : {
+      "ClusterBroker" : {
         "type" : "object",
         "properties" : {
           "id" : {
@@ -49050,46 +49050,215 @@
           },
           "reachable" : {
             "type" : "boolean",
-            "description" : "Whether Rahdar reaches it on the address it advertises."
+            "description" : "False when Rahdar did not reach it, or the cluster says it is not serving."
           },
           "reason" : {
-            "type" : [ "string", "null" ],
-            "description" : "Why it is not reachable or not serving."
+            "type" : [ "string", "null" ]
           },
           "leaders" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "underReplicated" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "offline" : {
-            "type" : "integer",
+            "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "Partitions it replicates that have no leader."
+            "description" : "Absent when the broker id is not a number. Never zero for an unknown."
+          },
+          "replicasHeld" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the broker id is not a number. Never zero for an unknown."
+          },
+          "outOfSyncReplicas" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when the broker id is not a number. Never zero for an unknown."
+          },
+          "offlineReplicas" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Partitions it replicates that have no leader. Absent when the id is not a number."
+          },
+          "quorumLeader" : {
+            "type" : "boolean"
           }
         },
-        "required" : [ "id", "leaders", "offline", "reachable", "underReplicated" ]
+        "required" : [ "id", "quorumLeader", "reachable" ]
       },
-      "Brokers" : {
+      "ClusterController" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records behind the quorum leader."
+          },
+          "caughtUp" : {
+            "type" : "boolean"
+          },
+          "quorumLeader" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "caughtUp", "id", "quorumLeader" ]
+      },
+      "ClusterProblems" : {
+        "type" : "object",
+        "properties" : {
+          "offline" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
+          },
+          "underReplicated" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
+          },
+          "preferredLeaderMismatches" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
+          },
+          "topics" : {
+            "type" : "array",
+            "description" : "At most 20 topic names. Empty when the caller lacks destination:read.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "topicsWithheld" : {
+            "type" : [ "string", "null" ],
+            "description" : "Set when the topic names need destination:read."
+          },
+          "topicsOmitted" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Topic names not in the list: past the cap, or all of them when withheld; absent when placement was not read."
+          }
+        },
+        "required" : [ "topics" ]
+      },
+      "ClusterTotals" : {
+        "type" : "object",
+        "properties" : {
+          "brokers" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "brokersReached" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "controllers" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "topics" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read; present as the floor when the topic cap was reached."
+          },
+          "partitions" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read; present as the floor when the topic cap was reached."
+          },
+          "underReplicated" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
+          },
+          "offline" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
+          },
+          "preferredLeaderMismatches" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
+          },
+          "atLeast" : {
+            "type" : "boolean",
+            "description" : "True when topics and partitions are a floor, not a total."
+          }
+        },
+        "required" : [ "atLeast", "brokers", "brokersReached", "controllers" ]
+      },
+      "ClusterView" : {
         "type" : "object",
         "properties" : {
           "mode" : {
             "type" : "string",
-            "description" : "KRaft or ZooKeeper."
+            "description" : "KRaft, ZooKeeper or Unknown."
+          },
+          "complete" : {
+            "type" : "boolean",
+            "description" : "False when the read stopped at the topic cap, or placement was not read."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the read is incomplete."
           },
           "brokers" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/BrokerRow"
+              "$ref" : "#/components/schemas/ClusterBroker"
+            }
+          },
+          "controllers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClusterController"
             }
           },
           "quorum" : {
             "$ref" : "#/components/schemas/BrokerQuorum"
+          },
+          "edges" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CoReplication"
+            }
+          },
+          "totals" : {
+            "$ref" : "#/components/schemas/ClusterTotals"
+          },
+          "problems" : {
+            "$ref" : "#/components/schemas/ClusterProblems"
+          },
+          "notes" : {
+            "type" : "array",
+            "description" : "What the cluster cannot show, in words. Never counted as healthy.",
+            "items" : {
+              "type" : "string"
+            }
           }
         },
-        "required" : [ "brokers", "mode", "quorum" ]
+        "required" : [ "brokers", "complete", "controllers", "edges", "mode", "notes", "problems", "quorum", "totals" ]
+      },
+      "CoReplication" : {
+        "type" : "object",
+        "properties" : {
+          "a" : {
+            "type" : "string",
+            "description" : "The lower broker id."
+          },
+          "b" : {
+            "type" : "string",
+            "description" : "The higher broker id."
+          },
+          "sharedPartitions" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "outOfSyncReplicas" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Shared partitions where a replica of this pair is out of sync."
+          }
+        },
+        "required" : [ "a", "b", "outOfSyncReplicas", "sharedPartitions" ]
       },
       "QuorumVoter" : {
         "type" : "object",

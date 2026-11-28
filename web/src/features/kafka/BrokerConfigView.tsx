@@ -211,8 +211,8 @@ export function BrokerConfigView() {
       <PageHeader
         title={clusterDefault ? 'Cluster default configuration' : `Configuration of broker ${broker}`}
         meta={
-          <Link to={`/clusters/${clusterId}/kafka/brokers`} className={linkClasses.link}>
-            All brokers
+          <Link to={`/clusters/${clusterId}/kafka/cluster`} className={linkClasses.link}>
+            Cluster
           </Link>
         }
         description="Each setting with the value in force and where it comes from. Change as many as you need, then review them together."

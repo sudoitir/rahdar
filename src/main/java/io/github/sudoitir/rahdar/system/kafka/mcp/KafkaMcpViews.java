@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.system.kafka.mcp;
 
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ClusterView;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigEntry;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigSource;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
@@ -32,6 +33,19 @@ final class KafkaMcpViews {
     static final int PAGE = 100;
 
     private KafkaMcpViews() {}
+
+    /** The screen's cluster view. {@code truncated} is set when the topic-name cap left names out. */
+    record ClusterAnswer(ClusterView cluster, boolean truncated, String note) {}
+
+    /**
+     * The cluster the screen reads. Topic names are already capped, and withheld without {@code destination:read}, by
+     * the service; this only says so when that cap left names out.
+     */
+    static ClusterAnswer cluster(ClusterView view) {
+        Long omitted = view.problems().topicsOmitted();
+        boolean capped = omitted != null && view.problems().topicsWithheld() == null && omitted > 0;
+        return new ClusterAnswer(view, capped, capped ? omitted + " more topic names need attention." : null);
+    }
 
     record TopicLag(
             String topic,

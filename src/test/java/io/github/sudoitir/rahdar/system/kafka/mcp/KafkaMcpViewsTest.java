@@ -3,6 +3,10 @@ package io.github.sudoitir.rahdar.system.kafka.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.BrokerQuorum;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ClusterProblems;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ClusterTotals;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ClusterView;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigEntry;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigSource;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
@@ -117,5 +121,41 @@ class KafkaMcpViewsTest {
                         .entries())
                 .extracting(ConfigEntry::name)
                 .containsExactly("segment.bytes", "cleanup.policy");
+    }
+
+    @Test
+    void aClusterAnswerNotesTheTopicNameCapAndKeepsTheServicesView() {
+        ClusterView few = cluster(List.of("orders"), null, 0);
+        var open = KafkaMcpViews.cluster(few);
+        assertThat(open.cluster()).isSameAs(few);
+        assertThat(open.truncated()).isFalse();
+        assertThat(open.note()).isNull();
+
+        List<String> names =
+                IntStream.range(0, KafkaMcpViews.TOP).mapToObj(i -> "t" + i).toList();
+        var exact = KafkaMcpViews.cluster(cluster(names, null, 0));
+        assertThat(exact.truncated()).isFalse();
+
+        var closed = KafkaMcpViews.cluster(cluster(names, null, 380));
+        assertThat(closed.truncated()).isTrue();
+        assertThat(closed.note()).contains("380");
+
+        var withheld = KafkaMcpViews.cluster(cluster(List.of(), "Topic names need destination:read.", 12));
+        assertThat(withheld.truncated()).isFalse();
+        assertThat(withheld.cluster().problems().topicsWithheld()).isNotNull();
+    }
+
+    private static ClusterView cluster(List<String> topics, String withheld, long omitted) {
+        return new ClusterView(
+                "KRaft",
+                true,
+                null,
+                List.of(),
+                List.of(),
+                new BrokerQuorum(true, null, "1", List.of(), true),
+                List.of(),
+                new ClusterTotals(3, 7, 1, 2L, 6L, 13L, 0L, 1L, false),
+                new ClusterProblems(0L, 13L, 1L, topics, withheld, omitted),
+                List.of());
     }
 }
