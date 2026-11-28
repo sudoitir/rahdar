@@ -120,7 +120,7 @@ public class KafkaClusterView {
                 quorum,
                 derived.edges(),
                 totals(derived, placement.read(), capped),
-                problems(derived, names),
+                problems(derived, names, placement.read()),
                 List.copyOf(notes));
     }
 
@@ -304,13 +304,16 @@ public class KafkaClusterView {
                 derived.controllers().size(),
                 topics,
                 partitions,
-                derived.under(),
-                derived.offline(),
-                derived.preferred(),
+                read ? derived.under() : null,
+                read ? derived.offline() : null,
+                read ? derived.preferred() : null,
                 capped);
     }
 
-    private static ClusterProblems problems(Derived derived, boolean names) {
+    private static ClusterProblems problems(Derived derived, boolean names, boolean read) {
+        if (!read) {
+            return new ClusterProblems(null, null, null, List.of(), null, null);
+        }
         List<String> topics = names ? derived.attention().stream().limit(TOP).toList() : List.of();
         long omitted = names
                 ? derived.attention().size() - topics.size()

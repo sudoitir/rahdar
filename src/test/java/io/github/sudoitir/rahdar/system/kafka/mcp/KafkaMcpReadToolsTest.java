@@ -38,8 +38,8 @@ class KafkaMcpReadToolsTest {
                 List.of(),
                 new BrokerQuorum(true, null, "1", List.of(), true),
                 List.of(),
-                new ClusterTotals(3, 7, 1, 2L, 6L, 13, 0, 1, false),
-                new ClusterProblems(0, 13, 1, List.of("orders"), null, 0),
+                new ClusterTotals(3, 7, 1, 2L, 6L, 13L, 0L, 1L, false),
+                new ClusterProblems(0L, 13L, 1L, List.of("orders"), null, 0L),
                 List.of());
         when(service.read(CLUSTER)).thenReturn(view);
         KafkaMcpReadTools tools = new KafkaMcpReadTools(null, null, null, null, null, null, null, null, service);

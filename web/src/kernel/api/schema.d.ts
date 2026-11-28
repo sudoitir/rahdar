@@ -9754,21 +9754,30 @@ export interface components {
             quorumLeader: boolean;
         };
         ClusterProblems: {
-            /** Format: int64 */
-            offline: number;
-            /** Format: int64 */
-            underReplicated: number;
-            /** Format: int64 */
-            preferredLeaderMismatches: number;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            offline?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            underReplicated?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            preferredLeaderMismatches?: number | null;
             /** @description At most 20 topic names. Empty when the caller lacks destination:read. */
             topics: string[];
             /** @description Set when the topic names need destination:read. */
             topicsWithheld?: string | null;
             /**
              * Format: int64
-             * @description Topic names not in the list: past the cap, or all of them when withheld.
+             * @description Topic names not in the list: past the cap, or all of them when withheld; absent when placement was not read.
              */
-            topicsOmitted: number;
+            topicsOmitted?: number | null;
         };
         ClusterTotals: {
             /** Format: int64 */
@@ -9787,12 +9796,21 @@ export interface components {
              * @description Absent when placement was not read; present as the floor when the topic cap was reached.
              */
             partitions?: number | null;
-            /** Format: int64 */
-            underReplicated: number;
-            /** Format: int64 */
-            offline: number;
-            /** Format: int64 */
-            preferredLeaderMismatches: number;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            underReplicated?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            offline?: number | null;
+            /**
+             * Format: int64
+             * @description Absent when placement was not read. Never an invented zero.
+             */
+            preferredLeaderMismatches?: number | null;
             /** @description True when topics and partitions are a floor, not a total. */
             atLeast: boolean;
         };

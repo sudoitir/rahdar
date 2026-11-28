@@ -49105,16 +49105,19 @@
         "type" : "object",
         "properties" : {
           "offline" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
           },
           "underReplicated" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
           },
           "preferredLeaderMismatches" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
           },
           "topics" : {
             "type" : "array",
@@ -49128,12 +49131,12 @@
             "description" : "Set when the topic names need destination:read."
           },
           "topicsOmitted" : {
-            "type" : "integer",
+            "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "Topic names not in the list: past the cap, or all of them when withheld."
+            "description" : "Topic names not in the list: past the cap, or all of them when withheld; absent when placement was not read."
           }
         },
-        "required" : [ "offline", "preferredLeaderMismatches", "topics", "topicsOmitted", "underReplicated" ]
+        "required" : [ "topics" ]
       },
       "ClusterTotals" : {
         "type" : "object",
@@ -49161,23 +49164,26 @@
             "description" : "Absent when placement was not read; present as the floor when the topic cap was reached."
           },
           "underReplicated" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
           },
           "offline" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
           },
           "preferredLeaderMismatches" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent when placement was not read. Never an invented zero."
           },
           "atLeast" : {
             "type" : "boolean",
             "description" : "True when topics and partitions are a floor, not a total."
           }
         },
-        "required" : [ "atLeast", "brokers", "brokersReached", "controllers", "offline", "preferredLeaderMismatches", "underReplicated" ]
+        "required" : [ "atLeast", "brokers", "brokersReached", "controllers" ]
       },
       "ClusterView" : {
         "type" : "object",

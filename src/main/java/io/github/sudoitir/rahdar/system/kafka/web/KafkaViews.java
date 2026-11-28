@@ -532,17 +532,27 @@ public final class KafkaViews {
                             "Absent when placement was not read; present as the floor when the topic cap was reached.")
             Long partitions,
 
-            @Schema(requiredMode = REQUIRED) long underReplicated,
-            @Schema(requiredMode = REQUIRED) long offline,
-            @Schema(requiredMode = REQUIRED) long preferredLeaderMismatches,
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long underReplicated,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long offline,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long preferredLeaderMismatches,
 
             @Schema(requiredMode = REQUIRED, description = "True when topics and partitions are a floor, not a total.")
             boolean atLeast) {}
 
     public record ClusterProblems(
-            @Schema(requiredMode = REQUIRED) long offline,
-            @Schema(requiredMode = REQUIRED) long underReplicated,
-            @Schema(requiredMode = REQUIRED) long preferredLeaderMismatches,
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long offline,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long underReplicated,
+
+            @Schema(nullable = true, description = "Absent when placement was not read. Never an invented zero.")
+            Long preferredLeaderMismatches,
 
             @Schema(
                     requiredMode = REQUIRED,
@@ -553,7 +563,8 @@ public final class KafkaViews {
             String topicsWithheld,
 
             @Schema(
-                    requiredMode = REQUIRED,
-                    description = "Topic names not in the list: past the cap, or all of them when withheld.")
-            long topicsOmitted) {}
+                    nullable = true,
+                    description =
+                            "Topic names not in the list: past the cap, or all of them when withheld; absent when placement was not read.")
+            Long topicsOmitted) {}
 }

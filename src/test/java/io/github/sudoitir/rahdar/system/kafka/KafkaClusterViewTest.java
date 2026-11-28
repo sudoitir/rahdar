@@ -231,8 +231,14 @@ class KafkaClusterViewTest {
         assertThat(cluster.totals().topics()).isNull();
         assertThat(cluster.totals().partitions()).isNull();
         assertThat(cluster.totals().atLeast()).isFalse();
+        assertThat(cluster.totals().underReplicated()).isNull();
+        assertThat(cluster.totals().offline()).isNull();
+        assertThat(cluster.totals().preferredLeaderMismatches()).isNull();
+        assertThat(cluster.problems().underReplicated()).isNull();
+        assertThat(cluster.problems().offline()).isNull();
+        assertThat(cluster.problems().preferredLeaderMismatches()).isNull();
+        assertThat(cluster.problems().topicsOmitted()).isNull();
         assertThat(cluster.problems().topicsWithheld()).isNull();
-        assertThat(cluster.problems().topicsOmitted()).isZero();
         assertThat(cluster.brokers()).singleElement().satisfies(broker -> {
             assertThat(broker.leaders()).isNull();
             assertThat(broker.replicasHeld()).isNull();

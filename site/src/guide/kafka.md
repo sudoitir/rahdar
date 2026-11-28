@@ -107,8 +107,8 @@ not listed before Kafka 4.0, so a broker that is absent is not read as healthy.
 **Dedicated controllers.** A controller that serves no clients is drawn as its own box. It is not counted
 among the brokers, and it has no co-replication edge.
 
-**More topics than one read describes.** The driver describes at most 2,000 topics at once. Past that, the
-topics and the partitions are stated as **at least** their figures, and so are the counts of the partitions
+**More topics than one read describes.** The driver describes at most 2,000 topics at once. At 2,000 or more,
+the topics and the partitions are stated as **at least** their figures, and so are the counts of the partitions
 that need attention. The page says the read is incomplete and why. Names of topics that need attention are
 listed up to 20, and the page says how many names were not listed.
 

@@ -42,8 +42,8 @@ final class KafkaMcpViews {
      * the service; this only says so when that cap left names out.
      */
     static ClusterAnswer cluster(ClusterView view) {
-        long omitted = view.problems().topicsOmitted();
-        boolean capped = view.problems().topicsWithheld() == null && omitted > 0;
+        Long omitted = view.problems().topicsOmitted();
+        boolean capped = omitted != null && view.problems().topicsWithheld() == null && omitted > 0;
         return new ClusterAnswer(view, capped, capped ? omitted + " more topic names need attention." : null);
     }
 

@@ -377,18 +377,18 @@ describe('the cluster', () => {
           controllers: 0,
           topics: null,
           partitions: null,
-          underReplicated: 0,
-          offline: 0,
-          preferredLeaderMismatches: 0,
+          underReplicated: null,
+          offline: null,
+          preferredLeaderMismatches: null,
           atLeast: false,
         },
         problems: {
-          offline: 0,
-          underReplicated: 0,
-          preferredLeaderMismatches: 0,
+          offline: null,
+          underReplicated: null,
+          preferredLeaderMismatches: null,
           topics: [],
           topicsWithheld: null,
-          topicsOmitted: 0,
+          topicsOmitted: null,
         },
         notes: ['Placement was not read: Read timed out'],
       }),
@@ -398,6 +398,8 @@ describe('the cluster', () => {
     expect(topics.closest('dl')?.querySelector('dd')).toHaveTextContent('Unavailable');
     const table = screen.getByRole('table', { name: 'Kafka brokers' });
     expect(within(table).getAllByText('Unavailable').length).toBeGreaterThanOrEqual(4);
+    const attention = screen.getByRole('group', { name: 'Partitions needing attention' });
+    expect(within(attention).getAllByText('Unavailable').length).toBe(3);
     expect(screen.getByText('This read is incomplete')).toBeInTheDocument();
     expect(screen.queryByText('No partition needs attention.')).toBeNull();
   });

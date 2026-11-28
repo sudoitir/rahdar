@@ -28,12 +28,13 @@ function figure(n: number | null | undefined): string {
 }
 
 /** Placement was not read: a zero would be an invented total. A capped read is a floor, and its numbers stand. */
-function counted(view: Cluster, n: number): number | null {
+function counted(view: Cluster, n: number | null | undefined): number | null {
+  if (n == null) return null;
   return view.totals.topics == null && !view.totals.atLeast ? null : n;
 }
 
 /** A floor, not a total. The word sits with the figure so a partial read is not read as everything. */
-function floorStat(view: Cluster, n: number): ReactNode {
+function floorStat(view: Cluster, n: number | null | undefined): ReactNode {
   const known = counted(view, n);
   if (known == null) return null;
   const text = known.toLocaleString();
@@ -46,7 +47,7 @@ function floorStat(view: Cluster, n: number): ReactNode {
   );
 }
 
-function floorText(view: Cluster, n: number): string {
+function floorText(view: Cluster, n: number | null | undefined): string {
   const known = counted(view, n);
   if (known == null) return 'Unavailable';
   const text = known.toLocaleString();
@@ -277,7 +278,8 @@ function Quorum({ view }: Readonly<{ view: Cluster }>) {
 
 function Attention({ clusterId, view }: Readonly<{ clusterId: string; view: Cluster }>) {
   const { problems } = view;
-  const names = problems.topicsOmitted === 1 ? 'name is' : 'names are';
+  const omitted = problems.topicsOmitted ?? 0;
+  const names = omitted === 1 ? 'name is' : 'names are';
   return (
     <Section title="Partitions needing attention">
       <Stack gap="sm">
@@ -295,9 +297,7 @@ function Attention({ clusterId, view }: Readonly<{ clusterId: string; view: Clus
             {problems.topicsWithheld}
           </Notice>
         ) : null}
-        {problems.topicsOmitted > 0 ? (
-          <Text size="sm">{`${problems.topicsOmitted.toLocaleString()} topic ${names} not listed.`}</Text>
-        ) : null}
+        {omitted > 0 ? <Text size="sm">{`${omitted.toLocaleString()} topic ${names} not listed.`}</Text> : null}
         {problems.topics.length > 0 ? (
           <ul className={styles.topics}>
             {problems.topics.map((topic) => (
@@ -311,7 +311,7 @@ function Attention({ clusterId, view }: Readonly<{ clusterId: string; view: Clus
               </li>
             ))}
           </ul>
-        ) : view.complete && !problems.topicsWithheld && problems.topicsOmitted === 0 ? (
+        ) : view.complete && !problems.topicsWithheld && omitted === 0 ? (
           <Text size="sm">No partition needs attention.</Text>
         ) : null}
       </Stack>
