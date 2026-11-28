@@ -1127,7 +1127,8 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             },
             notes: [],
           });
-          await page.getByRole('radio', { name: 'Table' }).click();
+          // The radio input is drawn at zero size under its label, so a click on it never lands.
+          await page.getByText('Table', { exact: true }).click();
           await settle(page);
         },
       },
