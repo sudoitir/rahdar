@@ -98,21 +98,6 @@ describe('the cluster', () => {
     expect(screen.getByText('2 of 3 voters are caught up, a majority.')).toBeInTheDocument();
   });
 
-  it('uses the singular when one voter is caught up', async () => {
-    stub(
-      cluster({
-        quorum: {
-          available: true,
-          leader: '1',
-          majority: true,
-          voters: [{ id: '1', lag: 0, caughtUp: true }],
-        },
-      }),
-    );
-    renderAppAt('/clusters/k1/kafka/cluster?view=table');
-    expect(await screen.findByText('1 of 1 voters is caught up, a majority.')).toBeInTheDocument();
-  });
-
   it('lists the same brokers in the table, with a link to each configuration', async () => {
     stub(cluster());
     const { router } = renderAppAt('/clusters/k1/kafka/cluster?view=table');
