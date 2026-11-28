@@ -57,8 +57,10 @@ public class KafkaClusterView {
     /** The driver's topic cap. Reaching it means the totals are a floor, including a cluster that has exactly this many. */
     static final int TOPIC_CAP = Topology.MAX_TOPICS;
 
-    static final String TOPIC_CAP_REASON = "The cluster describes at most " + TOPIC_CAP
-            + " topics at once, so these figures are a floor, not a total.";
+    static final String TOPIC_CAP_REASON = String.format(
+            Locale.ROOT,
+            "The cluster describes at most %,d topics at once, so these figures are a floor, not a total.",
+            TOPIC_CAP);
 
     static final String TOPICS_WITHHELD = "Topic names need destination:read.";
 
@@ -103,7 +105,7 @@ public class KafkaClusterView {
         fenceNote(mode, nodes.version()).ifPresent(notes::add);
         Placement placement = placement(connection, notes);
         boolean names = access.holds(clusterId, Permissions.DESTINATION_READ);
-        Derived derived = derive(nodes, placement.partitions());
+        Derived derived = derive(nodes, placement.partitions(), placement.read());
         boolean capped = placement.read() && derived.topics() >= TOPIC_CAP;
         if (capped) {
             notes.add(TOPIC_CAP_REASON);
@@ -201,7 +203,7 @@ public class KafkaClusterView {
         }
     }
 
-    private static Derived derive(Nodes nodes, List<Resource> partitions) {
+    private static Derived derive(Nodes nodes, List<Resource> partitions, boolean placementRead) {
         Map<Integer, long[]> counts = new HashMap<>();
         for (Described broker : nodes.brokers()) {
             if (broker.id() != null) {
@@ -263,7 +265,7 @@ public class KafkaClusterView {
         }
         List<ClusterBroker> brokers = new ArrayList<>();
         for (Described broker : nodes.brokers()) {
-            long[] count = broker.id() == null ? null : counts.get(broker.id());
+            long[] count = !placementRead || broker.id() == null ? null : counts.get(broker.id());
             brokers.add(new ClusterBroker(
                     broker.nativeId(),
                     broker.rack(),
@@ -294,8 +296,8 @@ public class KafkaClusterView {
     private static ClusterTotals totals(Derived derived, boolean read, boolean capped) {
         long reached =
                 derived.brokers().stream().filter(ClusterBroker::reachable).count();
-        Long topics = read && !capped ? (long) derived.topics() : null;
-        Long partitions = read && !capped ? (long) derived.partitions() : null;
+        Long topics = read ? (long) derived.topics() : null;
+        Long partitions = read ? (long) derived.partitions() : null;
         return new ClusterTotals(
                 derived.brokers().size(),
                 reached,
@@ -313,13 +315,8 @@ public class KafkaClusterView {
         long omitted = names
                 ? derived.attention().size() - topics.size()
                 : derived.attention().size();
-        return new ClusterProblems(
-                derived.offline(),
-                derived.under(),
-                derived.preferred(),
-                topics,
-                names ? null : TOPICS_WITHHELD,
-                omitted);
+        String withheld = !names && !derived.attention().isEmpty() ? TOPICS_WITHHELD : null;
+        return new ClusterProblems(derived.offline(), derived.under(), derived.preferred(), topics, withheld, omitted);
     }
 
     /** The first release a node actually reported. One with none does not hide a later one. */

@@ -108,9 +108,9 @@ not listed before Kafka 4.0, so a broker that is absent is not read as healthy.
 among the brokers, and it has no co-replication edge.
 
 **More topics than one read describes.** The driver describes at most 2,000 topics at once. Past that, the
-topics and the partitions are not given as a total: they are unavailable, and the counts that were read are
-stated as **at least** their figures. The page says the read is incomplete and why. Names of topics that need
-attention are listed up to 20, and the page says how many names were not listed.
+topics and the partitions are stated as **at least** their figures, and so are the counts of the partitions
+that need attention. The page says the read is incomplete and why. Names of topics that need attention are
+listed up to 20, and the page says how many names were not listed.
 
 Reading the cluster needs `cluster:read`. The counts of partitions that need attention come with that
 permission. Their topic names also need `destination:read`. Without it the names are withheld, a note says so,

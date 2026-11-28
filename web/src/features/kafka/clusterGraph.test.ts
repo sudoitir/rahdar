@@ -63,8 +63,8 @@ describe('clusterGraph', () => {
     expect(graph.nodes[1]?.state).toBeUndefined();
     expect(graph.edges[0]).toMatchObject({
       dashed: true,
-      label: '2 out of sync',
-      spoken: '2 out of sync of 4 shared partitions',
+      label: '4',
+      spoken: '4 shared partitions, 2 out of sync',
     });
   });
 

@@ -67,12 +67,12 @@ describe('DiagramView', () => {
   it('names each box with its kind, label and problem in words', async () => {
     draw();
     expect(
-      await screen.findByRole('button', { name: 'Call a service, charge. Invalid: Choose a connection.' }),
+      await screen.findByRole('button', { name: 'Call a service Invalid charge. Choose a connection.' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Invalid')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Flow orders' })).toBeInTheDocument();
     // An arrow's label reaches a screen reader through the box it points at.
-    expect(screen.getByRole('button', { name: 'Undo, release. Via undo 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo release. Via undo 1' })).toBeInTheDocument();
   });
 
   it('reads a longer edge sentence when the chip is only the count', async () => {
@@ -105,19 +105,19 @@ describe('DiagramView', () => {
   it('is one tab stop, moves with the arrow keys and selects with Enter', async () => {
     const onSelect = draw();
     const user = userEvent.setup();
-    await screen.findByRole('button', { name: /^Queue, orders/ });
+    await screen.findByRole('button', { name: /^Queue orders/ });
     await waitFor(() =>
       expect(
         screen.getAllByRole('button', { name: /^(Queue|Call|Undo)/ }).filter((b) => b.tabIndex === 0),
       ).toHaveLength(1),
     );
     await user.tab();
-    expect(screen.getByRole('button', { name: /^Queue, orders/ })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Queue orders/ })).toHaveFocus();
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('button', { name: /reserve/ })).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledWith('a');
-    expect(screen.getByText(/^Selected Call a service, reserve/)).toBeInTheDocument();
+    expect(screen.getByText(/^Selected Call a service reserve/)).toBeInTheDocument();
   });
 
   it("hands React Flow the scheme Mantine resolved, so its own controls follow the console's", async () => {
@@ -126,7 +126,7 @@ describe('DiagramView', () => {
         <DiagramView nodes={nodes} edges={edges} aria-label="Flow orders" />
       </MantineProvider>,
     );
-    await screen.findByRole('button', { name: /^Queue, orders/ });
+    await screen.findByRole('button', { name: /^Queue orders/ });
     expect(container.querySelector('.react-flow')).toHaveClass('light');
   });
 
@@ -149,7 +149,7 @@ describe('DiagramView', () => {
         <DiagramView nodes={nodes} edges={weighted} aria-label="Flow orders" />
       </MantineProvider>,
     );
-    await screen.findByRole('button', { name: /^Queue, orders/ });
+    await screen.findByRole('button', { name: /^Queue orders/ });
     const thick = container.querySelector<SVGElement>('[style*="--edge-weight"]');
     expect(thick).not.toBeNull();
     expect(thick?.style.getPropertyValue('--edge-weight')).toBe('12');
@@ -157,7 +157,7 @@ describe('DiagramView', () => {
 
   it('shows no editing controls unless the caller offers them', async () => {
     draw();
-    await screen.findByRole('button', { name: /^Queue, orders/ });
+    await screen.findByRole('button', { name: /^Queue orders/ });
     expect(screen.queryByRole('button', { name: /^Insert between/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Actions for/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('DiagramView', () => {
     const onInsert = vi.fn();
     drawEditable({ onInsert });
     const user = userEvent.setup();
-    const charge = await screen.findByRole('button', { name: /^Call a service, charge/ });
+    const charge = await screen.findByRole('button', { name: /^Call a service Invalid charge/ });
     charge.focus();
     await user.keyboard('{Insert}');
     await user.click(await screen.findByRole('menuitem', { name: 'Call a service' }));
@@ -190,7 +190,7 @@ describe('DiagramView', () => {
     const onNodeAction = vi.fn();
     drawEditable({ onNodeAction });
     const user = userEvent.setup();
-    const reserve = await screen.findByRole('button', { name: /^Call a service, reserve/ });
+    const reserve = await screen.findByRole('button', { name: /^Call a service reserve/ });
     reserve.focus();
     await user.keyboard('{Shift>}{F10}{/Shift}');
     const up = await screen.findByRole('menuitem', { name: /Move up/ });
@@ -214,7 +214,7 @@ describe('DiagramView', () => {
     expect(onNodeAction).toHaveBeenCalledWith('b', 'remove');
     await user.pointer({
       keys: '[MouseRight]',
-      target: screen.getByRole('button', { name: /^Call a service, reserve/ }),
+      target: screen.getByRole('button', { name: /^Call a service reserve/ }),
     });
     await user.click(await screen.findByRole('menuitem', { name: /Remove/ }));
     expect(onNodeAction).toHaveBeenLastCalledWith('a', 'remove');
@@ -223,6 +223,6 @@ describe('DiagramView', () => {
   });
 
   it('reads a warning as a warning', () => {
-    expect(nodeName({ id: 'x', label: 'x', state: 'warning', reason: 'Slow.' })).toBe('x. Warning: Slow.');
+    expect(nodeName({ id: 'x', label: 'x', state: 'warning', reason: 'Slow.' })).toBe('Warning x. Slow.');
   });
 });

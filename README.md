@@ -168,8 +168,8 @@ Details and what happens outside those ranges: [supported broker versions](https
   of each principal before and after the change.
 - **[Transactions](https://rahdar.dev/guide/kafka#transactions)** — a hanging transaction that holds
   read-committed consumers back is flagged, and aborting it is previewed, held and audited.
-- **[Brokers and the quorum](https://rahdar.dev/guide/kafka#brokers-and-the-quorum)** — every broker,
-  whether Rahdar reached it on its advertised address, and the KRaft controller quorum.
+- **[The cluster view](https://rahdar.dev/guide/kafka#the-cluster-view)** — every broker, whether Rahdar
+  reached it on its advertised address, which brokers share replicas, and the KRaft controller quorum.
 - **On the shared screens** — browse a topic by partition and offset or time, without joining a group;
   purge a group's unread records or truncate a topic with its reach stated, including every group that
   would lose records it has not read.
@@ -253,7 +253,7 @@ Details and what happens outside those ranges: [supported broker versions](https
   that records every change and its outcome.
 - **[MCP server](https://rahdar.dev/guide/mcp)** — the same
   capabilities for an AI assistant, under the same grants and the same audit trail. Its
-  eight `kafka_*` tools change nothing that was not previewed first, and wait for a person
+  `kafka_*` tools change nothing that was not previewed first, and wait for a person
   wherever the approval gate is on; six `rabbitmq_*` tools read a RabbitMQ cluster.
 - **[Plugins](https://rahdar.dev/guide/plugins)** — install a
   plugin's `.jar` from the UI: screens, API, assistant tools and data of its own, with

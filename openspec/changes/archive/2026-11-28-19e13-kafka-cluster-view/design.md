@@ -52,11 +52,11 @@ public record ClusterView(
 
 Component records, all in `KafkaViews`:
 
-- `ClusterBroker(String id, String rack, String address, boolean reachable, String reason, long leaders, long replicasHeld, long outOfSyncReplicas, long offlineReplicas, boolean quorumLeader)`
+- `ClusterBroker(String id, String rack, String address, boolean reachable, String reason, Long leaders, Long replicasHeld, Long outOfSyncReplicas, Long offlineReplicas, boolean quorumLeader)` — the four counters are `null` when placement was not read or the id is not a number, never an invented zero.
 - `ClusterController(String id, Long lag, boolean caughtUp, boolean quorumLeader)` — a controller-only node; `id` is its native id.
 - `CoReplication(String a, String b, long sharedPartitions, long outOfSyncReplicas)` — `a` and `b` are broker ids, sorted so the pair is stable.
-- `ClusterTotals(long brokers, long brokersReached, long controllers, Long topics, Long partitions, long underReplicated, long offline, long preferredLeaderMismatches, boolean atLeast)` — `topics` and `partitions` are `null` with `atLeast` true when the cap was reached, never an invented total.
-- `ClusterProblems(long offline, long underReplicated, long preferredLeaderMismatches, List<String> topics, String topicsWithheld)` — `topics` capped at `TOP`, `topicsWithheld` the note when the caller lacks `destination:read`.
+- `ClusterTotals(long brokers, long brokersReached, long controllers, Long topics, Long partitions, long underReplicated, long offline, long preferredLeaderMismatches, boolean atLeast)` — `topics` and `partitions` are `null` when placement was not read, and the figures the read did produce with `atLeast` true when the cap was reached, never an invented total.
+- `ClusterProblems(long offline, long underReplicated, long preferredLeaderMismatches, List<String> topics, String topicsWithheld)` — `topics` capped at `TOP`, `topicsWithheld` the note when the caller lacks `destination:read` and a name exists to withhold.
 
 `mode` is taken from the first node's `kafka.cluster_mode` attribute ("kraft" → "KRaft", "zookeeper" → "ZooKeeper", absent/"unknown" → "Unknown"), which is exactly `KafkaBrokers.read`'s current rule; the mapping is kept in the new service and `KafkaBrokers` is deleted.
 

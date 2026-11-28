@@ -12,7 +12,6 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterC
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ClusterBroker;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ClusterView;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.CoReplication;
 import java.time.Duration;
@@ -132,11 +131,14 @@ class KafkaClusterViewRealBrokerTest extends PostgresIntegrationTest {
                         assertThat(view.totals().underReplicated())
                                 .as(view.notes() + " " + view.brokers())
                                 .isPositive();
-                        ClusterBroker down = view.brokers().stream()
+                        // Kafka before 4.0 does not list fenced brokers, so a stopped one is absent from
+                        // the nodes; its replicas still count and its edges still dash.
+                        view.brokers().stream()
                                 .filter(broker -> broker.id().equals("3"))
                                 .findFirst()
-                                .orElseThrow();
-                        assertThat(down.reachable()).isFalse();
+                                .ifPresentOrElse(
+                                        down -> assertThat(down.reachable()).isFalse(),
+                                        () -> assertThat(view.notes()).contains(KafkaClusterView.FENCE_GAP));
                         assertThat(view.edges().stream()
                                         .filter(edge ->
                                                 edge.a().equals("3") || edge.b().equals("3")))

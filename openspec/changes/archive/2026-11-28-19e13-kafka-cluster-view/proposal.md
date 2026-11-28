@@ -25,7 +25,7 @@ The brokers screen lists each broker and the controller quorum, and it counts un
 ### New Capabilities
 - `kafka-cluster-view`: A read-only graph of one Kafka cluster and the same facts in words.
 ### Modified Capabilities
-- none
+- `system-kafka`: "Brokers and the controller quorum are shown" becomes "The cluster view shows brokers and the controller quorum".
 
 ## Out of scope
 - Tracing a message

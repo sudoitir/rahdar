@@ -68,18 +68,16 @@ function controllerNode(controller: ClusterGraphController): DiagramNode {
 }
 
 /**
- * The chip sits in the gap between 240px boxes, so it is the count only. The sentence is what
+ * The chip sits in the gap between the 320px boxes, so it is the shared count only. The sentence is what
  * DiagramView folds into the target's accessible name; the chip's words are a contiguous run of it.
- * A dashed stroke is the out-of-sync mark.
+ * A dashed stroke is the out-of-sync mark, and its count is spoken.
  */
 function edgeCopy(shared: number, outOfSync: number): { label: string; spoken: string } {
   const count = shared.toLocaleString();
   const noun = shared === 1 ? 'partition' : 'partitions';
-  if (outOfSync > 0) {
-    const label = `${outOfSync.toLocaleString()} out of sync`;
-    return { label, spoken: `${label} of ${count} shared ${noun}` };
-  }
-  return { label: count, spoken: `${count} shared ${noun}` };
+  const spoken =
+    outOfSync > 0 ? `${count} shared ${noun}, ${outOfSync.toLocaleString()} out of sync` : `${count} shared ${noun}`;
+  return { label: count, spoken };
 }
 
 /**

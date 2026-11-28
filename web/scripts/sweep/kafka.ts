@@ -70,14 +70,18 @@ const LONG_GROUP = `qa.${Array.from({ length: 8 }, (_, i) => `consumer-group-seg
 /** Waits for what a stub or an action changed to show. */
 export const settle = (page: Page) => page.waitForTimeout(500);
 
-/** A broker box the cluster-view stubs share. Counters are real zeros: the broker answered. */
+/**
+ * A broker box the cluster-view stubs share. The defaults are a six-partition, single-replica
+ * cluster split across three brokers: two leaders and two replicas each. A scene that changes the
+ * partition count or the replication factor overrides them so the counters stay possible.
+ */
 function sweepBroker(id: string, over: Record<string, unknown> = {}) {
   return {
     id,
     address: `kafka-${id}:9092`,
     reachable: true,
-    leaders: 6,
-    replicasHeld: 6,
+    leaders: 2,
+    replicasHeld: 2,
     outOfSyncReplicas: 0,
     offlineReplicas: 0,
     quorumLeader: false,
@@ -682,18 +686,23 @@ export const KAFKA_ROUTES: RouteSpec[] = [
         path: kafka('kafka/cluster'),
         empty: {
           mode: 'Unknown',
-          complete: false,
-          reason: 'No broker has answered yet.',
+          complete: true,
+          reason: null,
           brokers: [],
           controllers: [],
-          quorum: { available: false, reason: 'No broker answered.', voters: [], majority: false },
+          quorum: {
+            available: false,
+            reason: 'The cluster mode could not be read, so the quorum is not counted as healthy.',
+            voters: [],
+            majority: false,
+          },
           edges: [],
           totals: {
             brokers: 0,
             brokersReached: 0,
             controllers: 0,
-            topics: null,
-            partitions: null,
+            topics: 0,
+            partitions: 0,
             underReplicated: 0,
             offline: 0,
             preferredLeaderMismatches: 0,
@@ -707,7 +716,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             topicsWithheld: null,
             topicsOmitted: 0,
           },
-          notes: [],
+          notes: ['The cluster mode could not be read, so the quorum is not counted as healthy.'],
         },
       },
     ],
@@ -725,8 +734,8 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 id: '1',
                 address: 'kafka-1:9092',
                 reachable: true,
-                leaders: 12,
-                replicasHeld: 12,
+                leaders: 6,
+                replicasHeld: 9,
                 outOfSyncReplicas: 0,
                 offlineReplicas: 0,
                 quorumLeader: false,
@@ -735,8 +744,8 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 id: '2',
                 address: 'kafka-2:9092',
                 reachable: true,
-                leaders: 11,
-                replicasHeld: 11,
+                leaders: 6,
+                replicasHeld: 9,
                 outOfSyncReplicas: 0,
                 offlineReplicas: 0,
                 quorumLeader: false,
@@ -785,9 +794,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 rack: 'a',
                 address: 'kafka-1:9092',
                 reachable: true,
-                leaders: 12,
-                replicasHeld: 16,
-                outOfSyncReplicas: 4,
+                leaders: 7,
+                replicasHeld: 7,
+                outOfSyncReplicas: 0,
                 offlineReplicas: 0,
                 quorumLeader: true,
               },
@@ -796,9 +805,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 rack: 'b',
                 address: 'kafka-2:9092',
                 reachable: true,
-                leaders: 11,
-                replicasHeld: 16,
-                outOfSyncReplicas: 4,
+                leaders: 1,
+                replicasHeld: 5,
+                outOfSyncReplicas: 0,
                 offlineReplicas: 0,
                 quorumLeader: false,
               },
@@ -809,9 +818,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 reachable: false,
                 reason: 'Connection refused.',
                 leaders: 0,
-                replicasHeld: 3,
-                outOfSyncReplicas: 3,
-                offlineReplicas: 3,
+                replicasHeld: 5,
+                outOfSyncReplicas: 5,
+                offlineReplicas: 1,
                 quorumLeader: false,
               },
             ],
@@ -827,23 +836,23 @@ export const KAFKA_ROUTES: RouteSpec[] = [
               ],
             },
             edges: [
-              { a: '1', b: '2', sharedPartitions: 8, outOfSyncReplicas: 0 },
-              { a: '1', b: '3', sharedPartitions: 4, outOfSyncReplicas: 4 },
-              { a: '2', b: '3', sharedPartitions: 4, outOfSyncReplicas: 4 },
+              { a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 0 },
+              { a: '1', b: '3', sharedPartitions: 3, outOfSyncReplicas: 3 },
+              { a: '2', b: '3', sharedPartitions: 1, outOfSyncReplicas: 1 },
             ],
             totals: {
               brokers: 3,
               brokersReached: 2,
               controllers: 0,
-              topics: 5,
-              partitions: 20,
+              topics: 2,
+              partitions: 9,
               underReplicated: 4,
-              offline: 3,
+              offline: 1,
               preferredLeaderMismatches: 0,
               atLeast: false,
             },
             problems: {
-              offline: 3,
+              offline: 1,
               underReplicated: 4,
               preferredLeaderMismatches: 0,
               topics: ['orders'],
@@ -989,7 +998,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 id: '1',
                 address: 'kafka-1:9092',
                 reachable: true,
-                leaders: 6,
+                leaders: 3,
                 replicasHeld: 6,
                 outOfSyncReplicas: 0,
                 offlineReplicas: 0,
@@ -999,14 +1008,18 @@ export const KAFKA_ROUTES: RouteSpec[] = [
                 id: '2',
                 address: 'kafka-2:9092',
                 reachable: true,
-                leaders: 6,
+                leaders: 3,
                 replicasHeld: 6,
                 outOfSyncReplicas: 0,
                 offlineReplicas: 0,
                 quorumLeader: false,
               },
             ],
-            controllers: [{ id: '100', lag: 0, caughtUp: true, quorumLeader: true }],
+            controllers: [
+              { id: '100', lag: 0, caughtUp: true, quorumLeader: true },
+              { id: '101', lag: 0, caughtUp: true, quorumLeader: false },
+              { id: '102', lag: 1, caughtUp: true, quorumLeader: false },
+            ],
             quorum: {
               available: true,
               leader: '100',
@@ -1021,7 +1034,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             totals: {
               brokers: 2,
               brokersReached: 2,
-              controllers: 1,
+              controllers: 3,
               topics: 1,
               partitions: 6,
               underReplicated: 0,
@@ -1048,9 +1061,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             complete: true,
             reason: null,
             brokers: [
-              sweepBroker('1', { rack: 'a', quorumLeader: true }),
-              sweepBroker('2', { rack: 'b' }),
-              sweepBroker('3', { rack: 'c' }),
+              sweepBroker('1', { rack: 'a', quorumLeader: true, leaders: 6, replicasHeld: 12 }),
+              sweepBroker('2', { rack: 'b', leaders: 6, replicasHeld: 12 }),
+              sweepBroker('3', { rack: 'c', leaders: 6, replicasHeld: 12 }),
             ],
             controllers: [],
             quorum: {
@@ -1139,7 +1152,10 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             mode: 'KRaft',
             complete: true,
             reason: null,
-            brokers: [sweepBroker('1', { rack: 'a', quorumLeader: true }), sweepBroker('2', { rack: 'b' })],
+            brokers: [
+              sweepBroker('1', { rack: 'a', quorumLeader: true, leaders: 3, replicasHeld: 6 }),
+              sweepBroker('2', { rack: 'b', leaders: 3, replicasHeld: 6 }),
+            ],
             controllers: [],
             quorum: {
               available: true,
@@ -1176,14 +1192,20 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       {
         id: 'capped-pairs-stub',
         act: (page) => {
-          const brokers = Array.from({ length: 21 }, (_, i) => sweepBroker(String(i + 1), { quorumLeader: i === 0 }));
+          const brokers = Array.from({ length: 21 }, (_, i) =>
+            sweepBroker(String(i + 1), {
+              quorumLeader: i === 0,
+              leaders: i === 0 ? 20 : 19,
+              replicasHeld: 400,
+            }),
+          );
           const edges = [];
-          for (let i = 0; i < brokers.length && edges.length < 201; i++) {
-            for (let j = i + 1; j < brokers.length && edges.length < 201; j++) {
+          for (let i = 0; i < brokers.length; i++) {
+            for (let j = i + 1; j < brokers.length; j++) {
               edges.push({
                 a: brokers[i].id,
                 b: brokers[j].id,
-                sharedPartitions: 201 - edges.length,
+                sharedPartitions: 400,
                 outOfSyncReplicas: 0,
               });
             }
@@ -1230,8 +1252,28 @@ export const KAFKA_ROUTES: RouteSpec[] = [
           stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/cluster$/, {
             mode: 'KRaft',
             complete: false,
-            reason: 'The cluster describes at most 2000 topics at once, so these figures are a floor, not a total.',
-            brokers: [sweepBroker('1', { quorumLeader: true }), sweepBroker('2'), sweepBroker('3')],
+            reason: 'The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.',
+            brokers: [
+              sweepBroker('1', {
+                quorumLeader: true,
+                leaders: 667,
+                replicasHeld: 2000,
+                outOfSyncReplicas: 3,
+                offlineReplicas: 1,
+              }),
+              sweepBroker('2', {
+                leaders: 667,
+                replicasHeld: 2000,
+                outOfSyncReplicas: 2,
+                offlineReplicas: 1,
+              }),
+              sweepBroker('3', {
+                leaders: 665,
+                replicasHeld: 2000,
+                outOfSyncReplicas: 2,
+                offlineReplicas: 1,
+              }),
+            ],
             controllers: [],
             quorum: {
               available: true,
@@ -1239,13 +1281,17 @@ export const KAFKA_ROUTES: RouteSpec[] = [
               majority: true,
               voters: [{ id: '1', lag: 0, caughtUp: true }],
             },
-            edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 1 }],
+            edges: [
+              { a: '1', b: '2', sharedPartitions: 2000, outOfSyncReplicas: 4 },
+              { a: '1', b: '3', sharedPartitions: 2000, outOfSyncReplicas: 4 },
+              { a: '2', b: '3', sharedPartitions: 2000, outOfSyncReplicas: 3 },
+            ],
             totals: {
               brokers: 3,
               brokersReached: 3,
               controllers: 0,
-              topics: null,
-              partitions: null,
+              topics: 2000,
+              partitions: 2000,
               underReplicated: 4,
               offline: 1,
               preferredLeaderMismatches: 2,
@@ -1259,7 +1305,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
               topicsWithheld: null,
               topicsOmitted: 14,
             },
-            notes: ['The cluster describes at most 2000 topics at once, so these figures are a floor, not a total.'],
+            notes: ['The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.'],
           }),
       },
     ],

@@ -191,8 +191,8 @@ class KafkaClusterViewTest {
 
         assertThat(cluster.complete()).isFalse();
         assertThat(cluster.totals().atLeast()).isTrue();
-        assertThat(cluster.totals().topics()).isNull();
-        assertThat(cluster.totals().partitions()).isNull();
+        assertThat(cluster.totals().topics()).isEqualTo((long) KafkaClusterView.TOPIC_CAP);
+        assertThat(cluster.totals().partitions()).isEqualTo((long) KafkaClusterView.TOPIC_CAP);
         assertThat(cluster.reason()).isEqualTo(KafkaClusterView.TOPIC_CAP_REASON);
         assertThat(cluster.notes()).contains(KafkaClusterView.TOPIC_CAP_REASON);
     }
@@ -217,6 +217,41 @@ class KafkaClusterViewTest {
         assertThat(shown.problems().topicsWithheld()).isNull();
         assertThat(shown.problems().topicsOmitted()).isZero();
         assertThat(withheld.problems().topicsOmitted()).isEqualTo(1);
+    }
+
+    @Test
+    void aPlacementThatCannotBeReadIsUnavailableNotZero() {
+        describe(kraft("1", true));
+        when(resources.read(any(ResourceQuery.class))).thenThrow(new IllegalStateException("Read timed out"));
+
+        ClusterView cluster = view.read(CLUSTER);
+
+        assertThat(cluster.complete()).isFalse();
+        assertThat(cluster.reason()).contains(KafkaClusterView.PLACEMENT_UNREAD);
+        assertThat(cluster.totals().topics()).isNull();
+        assertThat(cluster.totals().partitions()).isNull();
+        assertThat(cluster.totals().atLeast()).isFalse();
+        assertThat(cluster.problems().topicsWithheld()).isNull();
+        assertThat(cluster.problems().topicsOmitted()).isZero();
+        assertThat(cluster.brokers()).singleElement().satisfies(broker -> {
+            assertThat(broker.leaders()).isNull();
+            assertThat(broker.replicasHeld()).isNull();
+            assertThat(broker.outOfSyncReplicas()).isNull();
+            assertThat(broker.offlineReplicas()).isNull();
+        });
+    }
+
+    @Test
+    void aHealthyClusterWithoutDestinationReadWithholdsNoNames() {
+        describe(kraft("1", false));
+        partitions(partition("orders", 0, 1, List.of(1), List.of(1)));
+        when(access.holds(CLUSTER, Permissions.DESTINATION_READ)).thenReturn(false);
+
+        ClusterView cluster = view.read(CLUSTER);
+
+        assertThat(cluster.problems().topics()).isEmpty();
+        assertThat(cluster.problems().topicsWithheld()).isNull();
+        assertThat(cluster.problems().topicsOmitted()).isZero();
     }
 
     @Test

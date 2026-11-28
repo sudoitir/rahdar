@@ -27,7 +27,7 @@ What a release or a mode cannot do is shown as unavailable, with its reason, and
 
 | On | Unavailable | Why |
 | --- | --- | --- |
-| ZooKeeper mode | The controller quorum | The quorum is a KRaft concept. The brokers page says the quorum is unknown, and a cluster whose brokers all serve is healthy with a note. |
+| ZooKeeper mode | The controller quorum | The quorum is a KRaft concept. The cluster view says the quorum is unknown, and a cluster whose brokers all serve is healthy with a note. |
 | Before 4.0 | Share groups | They arrived with 4.0. The groups list shows only the group types the cluster has. |
 | A cluster without an authoriser | ACLs | There is nothing to list. The ACLs page says so, with the broker's reason. |
 | An account that may not describe a group or topic | That group's lag, or that topic's configuration | The figure says it could not be read and why, instead of showing 0. |

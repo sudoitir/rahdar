@@ -522,12 +522,14 @@ public final class KafkaViews {
 
             @Schema(
                     nullable = true,
-                    description = "Absent when the read is a floor or placement was not read. Never an invented total.")
+                    description =
+                            "Absent when placement was not read; present as the floor when the topic cap was reached.")
             Long topics,
 
             @Schema(
                     nullable = true,
-                    description = "Absent when the read is a floor or placement was not read. Never an invented total.")
+                    description =
+                            "Absent when placement was not read; present as the floor when the topic cap was reached.")
             Long partitions,
 
             @Schema(requiredMode = REQUIRED) long underReplicated,

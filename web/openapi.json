@@ -49153,12 +49153,12 @@
           "topics" : {
             "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "Absent when the read is a floor or placement was not read. Never an invented total."
+            "description" : "Absent when placement was not read; present as the floor when the topic cap was reached."
           },
           "partitions" : {
             "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "Absent when the read is a floor or placement was not read. Never an invented total."
+            "description" : "Absent when placement was not read; present as the floor when the topic cap was reached."
           },
           "underReplicated" : {
             "type" : "integer",

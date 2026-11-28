@@ -9779,12 +9779,12 @@ export interface components {
             controllers: number;
             /**
              * Format: int64
-             * @description Absent when the read is a floor or placement was not read. Never an invented total.
+             * @description Absent when placement was not read; present as the floor when the topic cap was reached.
              */
             topics?: number | null;
             /**
              * Format: int64
-             * @description Absent when the read is a floor or placement was not read. Never an invented total.
+             * @description Absent when placement was not read; present as the floor when the topic cap was reached.
              */
             partitions?: number | null;
             /** Format: int64 */

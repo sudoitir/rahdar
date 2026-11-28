@@ -15,8 +15,8 @@ const BROKERS: ClusterView['brokers'] = [
     address: 'k1:9092',
     reachable: true,
     reason: null,
-    leaders: 10,
-    replicasHeld: 12,
+    leaders: 5,
+    replicasHeld: 9,
     outOfSyncReplicas: 0,
     offlineReplicas: 0,
     quorumLeader: true,
@@ -27,13 +27,23 @@ const BROKERS: ClusterView['brokers'] = [
     address: 'k2:9092',
     reachable: false,
     reason: 'Connection timed out.',
-    leaders: 0,
+    leaders: 3,
     replicasHeld: 4,
-    outOfSyncReplicas: 4,
+    outOfSyncReplicas: 2,
     offlineReplicas: 1,
     quorumLeader: false,
   },
 ];
+
+const HEALTHY_BROKERS = BROKERS.map((broker) => ({
+  ...broker,
+  reachable: true,
+  reason: null,
+  outOfSyncReplicas: 0,
+  offlineReplicas: 0,
+}));
+
+const CLEAN_EDGES = [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 0 }];
 
 function cluster(over: Partial<ClusterView> = {}): ClusterView {
   return {
@@ -52,7 +62,7 @@ function cluster(over: Partial<ClusterView> = {}): ClusterView {
         { id: '3', caughtUp: false },
       ],
     },
-    edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 1 }],
+    edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 2 }],
     totals: {
       brokers: 2,
       brokersReached: 1,
@@ -88,9 +98,7 @@ describe('the cluster', () => {
     renderAppAt('/clusters/k1/kafka/cluster');
     expect(await screen.findByRole('button', { name: /Broker 1/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Broker 2/ })).toHaveAccessibleName(/Not reached. Connection timed out/);
-    expect(screen.getByRole('button', { name: /Broker 2/ })).toHaveAccessibleName(
-      /1 out of sync of 4 shared partitions/,
-    );
+    expect(screen.getByRole('button', { name: /Broker 2/ })).toHaveAccessibleName(/4 shared partitions, 2 out of sync/);
     expect(screen.queryByRole('button', { name: /^Actions for/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Insert between/ })).toBeNull();
     expect(screen.getByText('1 of 2')).toBeInTheDocument();
@@ -119,10 +127,10 @@ describe('the cluster', () => {
     renderAppAt('/clusters/k1/kafka/cluster?view=table&broker=2');
     const aside = await screen.findByRole('complementary', { name: 'Chosen broker' });
     expect(within(aside).getByText(/Connection timed out/)).toBeInTheDocument();
-    expect(within(aside).getAllByText('Unknown').length).toBeGreaterThanOrEqual(3);
+    expect(within(aside).getAllByText('Unavailable').length).toBeGreaterThanOrEqual(3);
     expect(within(aside).queryByText('0')).toBeNull();
     const table = screen.getByRole('table', { name: 'Kafka brokers' });
-    expect(within(table).getAllByText('Unknown').length).toBeGreaterThanOrEqual(3);
+    expect(within(table).getAllByText('Unavailable').length).toBeGreaterThanOrEqual(3);
   });
 
   it('uses the singular when one voter is caught up', async () => {
@@ -178,7 +186,7 @@ describe('the cluster', () => {
     expect(screen.getByText('The controller quorum is not shown')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /The controller is kept in ZooKeeper and cannot be read. It is not read as healthy; it is unknown./,
+        /The controller is kept in ZooKeeper and cannot be read. It is not counted as healthy; it is unknown./,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Controller/ })).toBeNull();
@@ -199,6 +207,12 @@ describe('the cluster', () => {
   it('withholds topic names without destination:read and still states the counts', async () => {
     stub(
       cluster({
+        brokers: BROKERS.map((broker) =>
+          broker.id === '1'
+            ? { ...broker, leaders: 5, replicasHeld: 7 }
+            : { ...broker, leaders: 2, replicasHeld: 7, outOfSyncReplicas: 7, offlineReplicas: 2 },
+        ),
+        edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 7 }],
         problems: {
           offline: 2,
           underReplicated: 5,
@@ -207,41 +221,66 @@ describe('the cluster', () => {
           topicsWithheld: 'Topic names need destination:read.',
           topicsOmitted: 7,
         },
+        totals: {
+          brokers: 2,
+          brokersReached: 1,
+          controllers: 0,
+          topics: 3,
+          partitions: 9,
+          underReplicated: 5,
+          offline: 2,
+          preferredLeaderMismatches: 1,
+          atLeast: false,
+        },
       }),
     );
     renderAppAt('/clusters/k1/kafka/cluster?view=table');
     expect(await screen.findByText('Topic names need destination:read.')).toBeInTheDocument();
     expect(screen.getByText('7 topic names are not listed.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'orders' })).toBeNull();
+    expect(screen.queryByText('No partition needs attention.')).toBeNull();
     const counts = screen.getByRole('group', { name: 'Partitions needing attention' });
     expect(within(counts).getByText('5')).toBeInTheDocument();
   });
 
-  it('states a capped read as absent, never as zero', async () => {
+  it('states a capped read as at least what it read, never as a total', async () => {
     stub(
       cluster({
         complete: false,
-        reason: 'The cluster describes at most 2000 topics at once, so these figures are a floor, not a total.',
+        brokers: BROKERS.map((broker) =>
+          broker.id === '1'
+            ? { ...broker, leaders: 1333, replicasHeld: 1333 }
+            : { ...broker, leaders: 666, replicasHeld: 667, outOfSyncReplicas: 5, offlineReplicas: 1 },
+        ),
+        edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 4 }],
+        reason: 'The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.',
         totals: {
           brokers: 2,
           brokersReached: 1,
           controllers: 0,
-          topics: null,
-          partitions: null,
+          topics: 2000,
+          partitions: 2000,
           underReplicated: 4,
           offline: 1,
           preferredLeaderMismatches: 0,
           atLeast: true,
         },
-        notes: ['The cluster describes at most 2000 topics at once, so these figures are a floor, not a total.'],
+        problems: {
+          offline: 1,
+          underReplicated: 4,
+          preferredLeaderMismatches: 0,
+          topics: ['orders'],
+          topicsWithheld: null,
+          topicsOmitted: 0,
+        },
+        notes: ['The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.'],
       }),
     );
     renderAppAt('/clusters/k1/kafka/cluster?view=table');
     const topics = await screen.findByText('Topics');
     const figure = topics.closest('dl')?.querySelector('dd');
-    expect(figure).toHaveTextContent('Unavailable');
-    expect(figure).not.toHaveTextContent('0');
-    expect(topics.closest('dl')).toHaveTextContent('a floor, not a total');
+    expect(figure).toHaveTextContent('at least 2,000');
+    expect(figure).not.toHaveTextContent('Unavailable');
     const under = screen.getAllByText('Under-replicated')[0]?.closest('dl')?.querySelector('dd');
     expect(under).toHaveTextContent(/at least/);
     expect(under).toHaveTextContent('4');
@@ -254,13 +293,19 @@ describe('the cluster', () => {
     stub(
       cluster({
         complete: false,
-        reason: 'The cluster describes at most 2000 topics at once, so these figures are a floor, not a total.',
+        brokers: BROKERS.map((broker) =>
+          broker.id === '1'
+            ? { ...broker, leaders: 1333, replicasHeld: 1333 }
+            : { ...broker, leaders: 666, replicasHeld: 667, outOfSyncReplicas: 5, offlineReplicas: 1 },
+        ),
+        edges: [{ a: '1', b: '2', sharedPartitions: 4, outOfSyncReplicas: 4 }],
+        reason: 'The cluster describes at most 2,000 topics at once, so these figures are a floor, not a total.',
         totals: {
           brokers: 2,
           brokersReached: 1,
           controllers: 0,
-          topics: null,
-          partitions: null,
+          topics: 2000,
+          partitions: 2000,
           underReplicated: 4,
           offline: 1,
           preferredLeaderMismatches: 0,
@@ -279,6 +324,159 @@ describe('the cluster', () => {
     renderAppAt('/clusters/k1/kafka/cluster?view=table');
     expect(await screen.findByText('14 topic names are not listed.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'orders' })).toBeInTheDocument();
+  });
+
+  it('does not claim a capped read that found no problem is clean', async () => {
+    stub(
+      cluster({
+        complete: false,
+        brokers: HEALTHY_BROKERS,
+        edges: CLEAN_EDGES,
+        totals: {
+          brokers: 2,
+          brokersReached: 1,
+          controllers: 0,
+          topics: 2000,
+          partitions: 2000,
+          underReplicated: 0,
+          offline: 0,
+          preferredLeaderMismatches: 0,
+          atLeast: true,
+        },
+        problems: {
+          offline: 0,
+          underReplicated: 0,
+          preferredLeaderMismatches: 0,
+          topics: [],
+          topicsWithheld: null,
+          topicsOmitted: 0,
+        },
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster?view=table');
+    expect(await screen.findByText('This read is incomplete')).toBeInTheDocument();
+    expect(screen.queryByText('No partition needs attention.')).toBeNull();
+  });
+
+  it('states placement that could not be read as unavailable, not zero', async () => {
+    stub(
+      cluster({
+        complete: false,
+        brokers: BROKERS.map((broker) => ({
+          ...broker,
+          leaders: null,
+          replicasHeld: null,
+          outOfSyncReplicas: null,
+          offlineReplicas: null,
+        })),
+        edges: [],
+        reason: 'Placement was not read: Read timed out',
+        totals: {
+          brokers: 2,
+          brokersReached: 1,
+          controllers: 0,
+          topics: null,
+          partitions: null,
+          underReplicated: 0,
+          offline: 0,
+          preferredLeaderMismatches: 0,
+          atLeast: false,
+        },
+        problems: {
+          offline: 0,
+          underReplicated: 0,
+          preferredLeaderMismatches: 0,
+          topics: [],
+          topicsWithheld: null,
+          topicsOmitted: 0,
+        },
+        notes: ['Placement was not read: Read timed out'],
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster?view=table');
+    const topics = await screen.findByText('Topics');
+    expect(topics.closest('dl')?.querySelector('dd')).toHaveTextContent('Unavailable');
+    const table = screen.getByRole('table', { name: 'Kafka brokers' });
+    expect(within(table).getAllByText('Unavailable').length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByText('This read is incomplete')).toBeInTheDocument();
+    expect(screen.queryByText('No partition needs attention.')).toBeNull();
+  });
+
+  it('says no partition needs attention when a healthy read withheld no names', async () => {
+    stub(
+      cluster({
+        brokers: HEALTHY_BROKERS,
+        edges: CLEAN_EDGES,
+        totals: {
+          brokers: 2,
+          brokersReached: 1,
+          controllers: 0,
+          topics: 3,
+          partitions: 9,
+          underReplicated: 0,
+          offline: 0,
+          preferredLeaderMismatches: 0,
+          atLeast: false,
+        },
+        problems: {
+          offline: 0,
+          underReplicated: 0,
+          preferredLeaderMismatches: 0,
+          topics: [],
+          topicsWithheld: null,
+          topicsOmitted: 0,
+        },
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster?view=table');
+    expect(await screen.findByText('No partition needs attention.')).toBeInTheDocument();
+    expect(screen.queryByText('Topic names are withheld')).toBeNull();
+  });
+
+  it('draws a cluster of controllers alone without calling it empty', async () => {
+    stub(
+      cluster({
+        brokers: [],
+        controllers: [
+          { id: '100', lag: 0, caughtUp: true, quorumLeader: true },
+          { id: '101', lag: 0, caughtUp: true, quorumLeader: false },
+          { id: '102', lag: 0, caughtUp: true, quorumLeader: false },
+        ],
+        quorum: {
+          available: true,
+          leader: '100',
+          majority: true,
+          voters: [
+            { id: '100', lag: 0, caughtUp: true },
+            { id: '101', lag: 0, caughtUp: true },
+            { id: '102', lag: 0, caughtUp: true },
+          ],
+        },
+        edges: [],
+        totals: {
+          brokers: 0,
+          brokersReached: 0,
+          controllers: 3,
+          topics: 0,
+          partitions: 0,
+          underReplicated: 0,
+          offline: 0,
+          preferredLeaderMismatches: 0,
+          atLeast: false,
+        },
+        problems: {
+          offline: 0,
+          underReplicated: 0,
+          preferredLeaderMismatches: 0,
+          topics: [],
+          topicsWithheld: null,
+          topicsOmitted: 0,
+        },
+      }),
+    );
+    renderAppAt('/clusters/k1/kafka/cluster');
+    expect(await screen.findByRole('button', { name: /controller 100/i })).toBeInTheDocument();
+    expect(screen.queryByText('No broker has answered yet')).toBeNull();
   });
 
   it('holds the graph frame while the cluster loads', async () => {
@@ -316,13 +514,13 @@ describe('the cluster', () => {
     const edges = Array.from({ length: 201 }, (_, i) => ({
       a: '1',
       b: String(i + 2),
-      sharedPartitions: 201 - i,
+      sharedPartitions: 1,
       outOfSyncReplicas: 0,
     }));
     const first = BROKERS[0];
     if (!first) throw new Error('fixture');
     const brokers = [
-      first,
+      { ...first, leaders: 201, replicasHeld: 201 },
       ...edges.map((edge) => ({
         id: edge.b,
         rack: null,
@@ -336,7 +534,23 @@ describe('the cluster', () => {
         quorumLeader: false,
       })),
     ];
-    stub(cluster({ brokers, edges }));
+    stub(
+      cluster({
+        brokers,
+        edges,
+        totals: {
+          brokers: 202,
+          brokersReached: 202,
+          controllers: 0,
+          topics: 1,
+          partitions: 201,
+          underReplicated: 0,
+          offline: 0,
+          preferredLeaderMismatches: 0,
+          atLeast: false,
+        },
+      }),
+    );
     renderAppAt('/clusters/k1/kafka/cluster');
     expect(await screen.findByText(/1 co-replication pair beyond the strongest 200/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Actions for/ })).toBeNull();

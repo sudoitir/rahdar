@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { SegmentedControl, Stack, Text } from '@mantine/core';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 
+import { branding } from '../../branding.ts';
 import { DescriptionList } from '../../ui/DescriptionList.tsx';
 import { DiagramView } from '../../ui/DiagramView.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -23,7 +24,7 @@ import styles from './ClusterView.module.css';
 type SetSearch = (patch: Partial<ClusterSearch>) => void;
 
 function figure(n: number | null | undefined): string {
-  return n == null ? 'Unknown' : n.toLocaleString();
+  return n == null ? 'Unavailable' : n.toLocaleString();
 }
 
 /** Placement was not read: a zero would be an invented total. A capped read is a floor, and its numbers stand. */
@@ -47,7 +48,7 @@ function floorStat(view: Cluster, n: number): ReactNode {
 
 function floorText(view: Cluster, n: number): string {
   const known = counted(view, n);
-  if (known == null) return 'Unknown';
+  if (known == null) return 'Unavailable';
   const text = known.toLocaleString();
   return view.totals.atLeast ? `at least ${text}` : text;
 }
@@ -137,7 +138,7 @@ function brokerColumns(
     {
       id: 'leaders',
       header: 'Leaders',
-      description: 'Partitions this broker leads. Unknown when its id is not a number.',
+      description: 'Partitions this broker leads. Unavailable when placement was not read or its id is not a number.',
       accessor: (b) => b.leaders ?? null,
       cell: (b) => figure(b.leaders),
       kind: 'number',
@@ -147,7 +148,7 @@ function brokerColumns(
       id: 'replicasHeld',
       header: 'Replicas held',
       short: 'Held',
-      description: 'Replicas this broker holds. Unknown when its id is not a number.',
+      description: 'Replicas this broker holds. Unavailable when placement was not read or its id is not a number.',
       accessor: (b) => b.replicasHeld ?? null,
       cell: (b) => figure(b.replicasHeld),
       kind: 'number',
@@ -157,7 +158,8 @@ function brokerColumns(
       id: 'outOfSyncReplicas',
       header: 'Out of sync',
       short: 'Out of sync',
-      description: 'Replicas it holds that are out of sync. Unknown when its id is not a number.',
+      description:
+        'Replicas it holds that are out of sync. Unavailable when placement was not read or its id is not a number.',
       accessor: (b) => b.outOfSyncReplicas ?? null,
       cell: (b) => figure(b.outOfSyncReplicas),
       kind: 'number',
@@ -166,7 +168,8 @@ function brokerColumns(
     {
       id: 'offlineReplicas',
       header: 'Offline',
-      description: 'Partitions it replicates that have no leader. Unknown when its id is not a number.',
+      description:
+        'Partitions it replicates that have no leader. Unavailable when placement was not read or its id is not a number.',
       accessor: (b) => b.offlineReplicas ?? null,
       cell: (b) => figure(b.offlineReplicas),
       kind: 'number',
@@ -199,12 +202,12 @@ function Totals({ view }: Readonly<{ view: Cluster }>) {
       <Stat label="Controllers" value={view.totals.controllers.toLocaleString()} />
       <Stat
         label="Topics"
-        value={view.totals.topics == null ? null : view.totals.topics.toLocaleString()}
+        value={view.totals.topics == null ? null : floorStat(view, view.totals.topics)}
         unavailableReason={reason}
       />
       <Stat
         label="Partitions"
-        value={view.totals.partitions == null ? null : view.totals.partitions.toLocaleString()}
+        value={view.totals.partitions == null ? null : floorStat(view, view.totals.partitions)}
         unavailableReason={reason}
       />
       <Stat label="Under-replicated" value={floorStat(view, view.totals.underReplicated)} unavailableReason={reason} />
@@ -265,7 +268,7 @@ function Quorum({ view }: Readonly<{ view: Cluster }>) {
         </Stack>
       ) : (
         <Notice tone="info" title="The controller quorum is not shown">
-          {quorum.reason ?? 'This cluster does not expose its quorum.'} It is not read as healthy; it is unknown.
+          {quorum.reason ?? 'This cluster does not expose its quorum.'} It is not counted as healthy; it is unknown.
         </Notice>
       )}
     </Section>
@@ -308,9 +311,9 @@ function Attention({ clusterId, view }: Readonly<{ clusterId: string; view: Clus
               </li>
             ))}
           </ul>
-        ) : problems.topicsWithheld || problems.topicsOmitted > 0 ? null : (
+        ) : view.complete && !problems.topicsWithheld && problems.topicsOmitted === 0 ? (
           <Text size="sm">No partition needs attention.</Text>
-        )}
+        ) : null}
       </Stack>
     </Section>
   );
@@ -354,6 +357,11 @@ function BrokerAside({
             { term: 'Replicas out of sync', value: figure(broker.outOfSyncReplicas) },
           ]}
         />
+        {broker.leaders == null ? (
+          <Text size="sm" c="dimmed">
+            {view.reason ?? "The cluster cannot count this broker's partitions: its id is not a number."}
+          </Text>
+        ) : null}
         <Link
           to={`/clusters/${clusterId}/kafka/brokers/${encodeURIComponent(broker.id)}/config`}
           className={linkClasses.link}
@@ -473,8 +481,14 @@ export function ClusterView() {
         <LoadingState label="Loading the cluster" blockSize="100%" />
       </div>
     );
-  } else if (cluster.data.brokers.length === 0) {
-    body = <EmptyState kind="empty" title="No broker has answered yet" description="Rahdar keeps looking." />;
+  } else if (cluster.data.brokers.length === 0 && cluster.data.controllers.length === 0) {
+    body = (
+      <EmptyState
+        kind="empty"
+        title="No broker has answered yet"
+        description={`${branding.productName} keeps looking.`}
+      />
+    );
   } else {
     body = <ClusterBody clusterId={clusterId} view={cluster.data} search={search} setSearch={setSearch} />;
   }
@@ -483,7 +497,7 @@ export function ClusterView() {
     <Page>
       <PageHeader
         title="Cluster"
-        description="The brokers of this cluster, the controllers that elect their leaders, and which brokers share replicas."
+        description="The brokers of this cluster, the controllers that serve no clients, and which brokers share replicas."
         meta={
           <Link to={`/clusters/${clusterId}/kafka/brokers/default/config`} className={linkClasses.link}>
             Cluster default configuration

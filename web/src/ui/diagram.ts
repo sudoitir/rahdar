@@ -63,12 +63,11 @@ export function layoutSignature(nodes: DiagramNode[], edges: DiagramEdge[], dire
  * screen reader otherwise never meets), and any problem.
  */
 export function nodeName(n: DiagramNode, via: string[] = []): string {
-  let name = [n.kind, n.label, n.detail].filter(Boolean).join(', ');
+  // The same words, in the same order, as the box draws them: axe requires the visible text to be
+  // a contiguous run of the accessible name. The state word sits with the kind, above the label.
+  const problem = n.state === 'error' ? 'Invalid' : n.state === 'warning' ? 'Warning' : null;
+  let name = [n.kind, problem, n.label, n.detail].filter(Boolean).join(' ');
   if (via.length) name += `. Via ${via.join('; ')}`;
-  if (n.state) {
-    const problem = n.state === 'error' ? 'Invalid' : 'Warning';
-    const why = n.reason ? `: ${n.reason}` : '';
-    name += `. ${problem}${why}`;
-  }
+  if (n.reason) name += `. ${n.reason}`;
   return name;
 }

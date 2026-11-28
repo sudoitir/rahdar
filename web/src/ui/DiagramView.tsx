@@ -169,6 +169,7 @@ function NodeKind({ node }: Readonly<{ node: DiagramNode }>) {
   return (
     <span className={classes.kind}>
       {node.kind}
+      {node.kind && node.state ? ' ' : null}
       {node.state ? <span className={classes.state}>{STATE_WORD[node.state]}</span> : null}
     </span>
   );
@@ -228,9 +229,13 @@ function CardButton({
       onContextMenu={onContextMenu}
       onKeyDown={onKeyDown}
     >
-      <NodeKind node={n} />
-      <span className={classes.label}>{n.label}</span>
-      {n.detail ? <span className={classes.detail}>{n.detail}</span> : null}
+      <NodeKind node={n} /> <span className={classes.label}>{n.label}</span>
+      {n.detail ? (
+        <>
+          {' '}
+          <span className={classes.detail}>{n.detail}</span>
+        </>
+      ) : null}
     </button>
   );
 }

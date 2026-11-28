@@ -118,7 +118,7 @@ Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker �
 - **[Topic 配置](https://rahdar.dev/guide/kafka#topic-configuration)**——每项设置都标明其值的来源，通过审查来修改，Broker 会在任何改动生效之前先行校验。
 - **[ACL](https://rahdar.dev/guide/kafka#acls)**——列出、添加和删除，并展示变更前后每个主体的有效权限。
 - **[事务](https://rahdar.dev/guide/kafka#transactions)**——会拖住 read-committed 消费者的挂起事务会被标出，中止它之前先预览、按住确认并写入审计。
-- **[Broker 与仲裁](https://rahdar.dev/guide/kafka#brokers-and-the-quorum)**——每个 Broker，Rahdar 是否通过其宣告的地址连上了它，以及 KRaft controller 仲裁。
+- **[集群视图](https://rahdar.dev/guide/kafka#the-cluster-view)**——每个 Broker，Rahdar 是否通过其宣告的地址连上了它，哪些 Broker 共享副本，以及 KRaft controller 仲裁。
 - **在共用界面上**——按分区与偏移量或时间浏览 topic，无需加入消费者组；清空消费者组未读的记录，或截断 topic，并说明影响范围，包括每个会丢失未读记录的消费者组。
 
 ### RabbitMQ
@@ -150,7 +150,7 @@ Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker �
 - **[告警投递](https://rahdar.dev/guide/alert-delivery)**——支持 Slack、Microsoft Teams、PagerDuty（事件随告警自动开启和解决）、邮件和带签名的 webhook。每个渠道保存前都会先测试，投递日志会告诉你通知为什么发送失败。
 - **[数据治理](https://rahdar.dev/guide/data-governance)**——自动遮蔽敏感的消息头和属性，自动识别个人敏感信息（PII），并按查看者的角色决定是否脱敏。
 - **治理**——全面强制认证；角色与权限按“全局 → 环境 → 集群”分级授予；支持 API 令牌和可选的 OIDC/SSO；审计记录每一次变更及其结果。
-- **[MCP 服务器](https://rahdar.dev/zh/guide/mcp)**——把同样的能力开放给 AI 助手，适用同样的授权，留下同样的审计记录。它的八个 `kafka_*` 工具不会改动任何事先没有预览过的内容，并在启用审批闸门时等待人来批准。
+- **[MCP 服务器](https://rahdar.dev/zh/guide/mcp)**——把同样的能力开放给 AI 助手，适用同样的授权，留下同样的审计记录。它的 `kafka_*` 工具不会改动任何事先没有预览过的内容，并在启用审批闸门时等待人来批准。
 - **[插件](https://rahdar.dev/guide/plugins)**——在界面里直接安装插件的 `.jar`：它可以带来自己的页面、API、助手工具和数据。确认之前，它能做的一切都会展示给你；除非确有需要，否则无需重启。更新时会列出变化并支持回滚；插件出错也绝不会拖垮 Rahdar。可以从[插件模板](examples/plugin-template)开始写一个。
 
 ## 工作原理
